@@ -1,30 +1,56 @@
 import 'package:flutter/material.dart';
-import 'config/app_theme.dart';
-import 'screens/contacts/contacts_list_screen.dart';
+import 'package:provider/provider.dart';
 
-void main() {
-  print('🚀 ========================================');
-  print('🚀 应用启动：Kongo - 通讯录和日程管理');
-  print('🚀 ========================================');
-  print('⏱️  启动时间: ${DateTime.now()}');
-  
-  runApp(const MyApp());
-  
-  print('✅ MyApp 已创建');
+import 'config/app_theme.dart';
+import 'screens/app_shell_screen.dart';
+import 'services/app_dependencies.dart';
+import 'services/contact_service.dart';
+import 'services/event_service.dart';
+import 'services/read/contact_read_service.dart';
+import 'services/read/event_read_service.dart';
+import 'services/summary_service.dart';
+import 'widgets/common/window_theme_sync.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final dependencies = await AppDependencies.bootstrap();
+  runApp(MyApp(dependencies: dependencies));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final AppDependencies dependencies;
+
+  const MyApp({
+    super.key,
+    required this.dependencies,
+  });
 
   @override
   Widget build(BuildContext context) {
-    print('🎨 MyApp.build() 被调用');
-    
-    return MaterialApp(
-      title: 'Kongo - 通讯录和日程管理',
-      theme: AppTheme.lightTheme,
-      home: const ContactsListScreen(),
-      debugShowCheckedModeBanner: false,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: dependencies.attachmentProvider),
+        ChangeNotifierProvider.value(value: dependencies.contactProvider),
+        ChangeNotifierProvider.value(value: dependencies.eventProvider),
+        ChangeNotifierProvider.value(value: dependencies.summaryProvider),
+        ChangeNotifierProvider.value(value: dependencies.tagProvider),
+        Provider<ContactService>.value(value: dependencies.contactService),
+        Provider<EventService>.value(value: dependencies.eventService),
+        Provider<SummaryService>.value(value: dependencies.summaryService),
+        Provider<ContactReadService>.value(value: dependencies.contactReadService),
+        Provider<EventReadService>.value(value: dependencies.eventReadService),
+      ],
+      child: MaterialApp(
+        title: 'Kongo',
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
+        builder: (context, child) => WindowThemeSync(
+          child: child ?? const SizedBox.shrink(),
+        ),
+        home: const AppShellScreen(),
+        debugShowCheckedModeBanner: false,
+      ),
     );
   }
 }

@@ -1,0 +1,1 @@
+enum SearchMode { or, and }

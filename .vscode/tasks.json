@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Launch macOS UI",
+			"type": "shell",
+			"command": "source ~/.zshrc && flutter build macos && open build/macos/Build/Products/Release/kongo.app",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "Launch macOS client",
+			"type": "shell",
+			"command": "source ~/.zshrc && flutter build macos && open build/macos/Build/Products/Release/kongo.app",
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}

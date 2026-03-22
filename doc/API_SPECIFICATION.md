@@ -1,875 +1,291 @@
-# Kongo API 接口规范
+# Kongo 内部接口规范
 
-## API架构概述
+## 目的
 
-本文档定义了应用内部API接口规范，用于Service层、Repository层和UI层之间的通信。
+本文档描述当前代码中真实存在的分层契约，而不是早期设想版本。
 
----
+当前主分层如下：
 
-## 通用规范
+```text
+Screen -> Widget / Action -> Provider -> Read Service / Service -> Repository -> SQLite / File System
+```
 
-### 错误处理
+## 通用约束
 
-#### 异常分类
+### Screen
+- 负责页面编排、导航入口、状态选择
+- 不直接编排多段数据库聚合查询
 
+### Provider
+- 管理页面状态、异步流程、错误与初始化标记
+- 写流程依赖 `Service`
+- 读聚合优先依赖 `ReadService`
+
+### Service
+- 封装业务规则、校验、跨 repository 编排
+- 不直接依赖 UI
+
+### Read Service
+- 只负责只读聚合
+- 不承载 create / update / delete 规则
+
+### Repository
+- 负责 SQLite CRUD 与批量查询
+- 不承载业务规则
+
+## 异常模型
+
+当前统一异常层定义在 `lib/exceptions/app_exception.dart`。
+
+### 基类
 ```dart
-// 基础异常类
 abstract class AppException implements Exception {
   final String message;
   final String? code;
   final Exception? originalException;
-
-  AppException({
-    required this.message,
-    this.code,
-    this.originalException,
-  });
-
-  @override
-  String toString() => message;
-}
-
-// 数据库异常
-class DatabaseException extends AppException {
-  DatabaseException({
-    required String message,
-    String? code,
-    Exception? originalException,
-  }) : super(
-    message: message,
-    code: code,
-    originalException: originalException,
-  );
-}
-
-// 验证异常
-class ValidationException extends AppException {
-  ValidationException({
-    required String message,
-    String? code,
-  }) : super(message: message, code: code);
-}
-
-// 业务逻辑异常
-class BusinessException extends AppException {
-  BusinessException({
-    required String message,
-    String? code,
-  }) : super(message: message, code: code);
 }
 ```
 
-### 响应类型
+### 已实现子类
+- `DatabaseException`
+- `ValidationException`
+- `BusinessException`
+- `FileStorageException`
+- `AiException`
 
-所有异步方法都应该返回Future或Stream，不应返回nullable类型，而是通过异常处理。
+### 返回约定
+- 查询列表返回空列表，不返回 `null`
+- 查询单对象通常抛异常，不返回空对象
+- 创建 / 更新方法返回最终落库对象
+- 仅少量明确允许“缺失即正常”的接口返回可空值，例如 `getSummaryByDate()`
 
-```dart
-// ✓ 正确做法
-Future<Contact> getContact(String id);
-Future<List<Contact>> getContacts();
+## Service 契约
 
-// ✗ 错误做法
-Future<Contact?> getContact(String id);  // 避免使用nullable Future
-```
+### ContactService
+职责：联系人 CRUD、关键字搜索、按标签过滤、联系人视角读取事件与标签。
 
----
-
-## ContactService API
-
-### 概述
-处理通讯人相关的业务逻辑。
-
-### 方法签名
-
-#### 1. 获取所有通讯人
+当前接口：
 
 ```dart
-/// 获取所有通讯人
-/// 
-/// 返回按创建时间降序排列的通讯人列表。
-/// 
-/// 返回值：
-/// - 通讯人列表（若为空则返回空列表）
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-Future<List<Contact>> getContacts();
-```
-
-**示例**:
-```dart
-try {
-  final contacts = await contactService.getContacts();
-  print('获取${contacts.length}个通讯人');
-} on DatabaseException catch (e) {
-  print('获取通讯人失败: ${e.message}');
-}
-```
-
----
-
-#### 2. 获取单个通讯人
-
-```dart
-/// 获取指定ID的通讯人
-/// 
-/// 参数：
-/// - [id] 通讯人ID
-/// 
-/// 返回值：
-/// - 通讯人对象
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败或通讯人不存在
-Future<Contact> getContact(String id);
-```
-
-**示例**:
-```dart
-try {
-  final contact = await contactService.getContact('abc123');
-  print('${contact.name} - ${contact.phone}');
-} on DatabaseException catch (e) {
-  print('获取通讯人失败: ${e.message}');
-}
-```
-
----
-
-#### 3. 创建通讯人
-
-```dart
-/// 创建新的通讯人
-/// 
-/// 参数：
-/// - [contact] 待创建的通讯人对象
-///   注意：id、createdAt、updatedAt字段将被自动填充
-/// 
-/// 返回值：
-/// - 创建成功后的通讯人对象（包含自动生成的id）
-/// 
-/// 异常：
-/// - [ValidationException] 如果输入数据不合法
-/// - [DatabaseException] 如果数据库操作失败
-/// 
-/// 业务规则：
-/// - name 字段必填
-/// - phone 和 email 可选但应符合格式要求
-Future<Contact> createContact(Contact contact);
-```
-
-**示例**:
-```dart
-try {
-  final newContact = Contact(
-    id: '', // 将被忽略
-    name: '张三',
-    phone: '+86-13800000000',
-    email: 'zhangsan@example.com',
-    createdAt: DateTime.now(), // 将被覆盖
-    updatedAt: DateTime.now(), // 将被覆盖
-  );
-  
-  final created = await contactService.createContact(newContact);
-  print('创建成功，ID: ${created.id}');
-} on ValidationException catch (e) {
-  print('输入数据不合法: ${e.message}');
-}
-```
-
----
-
-#### 4. 更新通讯人
-
-```dart
-/// 更新现有通讯人信息
-/// 
-/// 参数：
-/// - [contact] 更新后的通讯人对象
-///   注意：id 必须存在，updatedAt 将被自动更新
-/// 
-/// 返回值：
-/// - 更新成功后的通讯人对象
-/// 
-/// 异常：
-/// - [ValidationException] 如果输入数据不合法
-/// - [DatabaseException] 如果通讯人不存在或数据库操作失败
-/// 
-/// 业务规则：
-/// - id 字段必须存在
-/// - 只更新提供的字段值
-Future<Contact> updateContact(Contact contact);
-```
-
-**示例**:
-```dart
-try {
-  final updated = contact.copyWith(
-    phone: '+86-13900000000',
-  );
-  
-  final result = await contactService.updateContact(updated);
-  print('更新成功');
-} on DatabaseException catch (e) {
-  print('更新失败: ${e.message}');
-}
-```
-
----
-
-#### 5. 删除通讯人
-
-```dart
-/// 删除指定通讯人及其所有关联数据
-/// 
-/// 参数：
-/// - [id] 待删除通讯人的ID
-/// 
-/// 异常：
-/// - [DatabaseException] 如果通讯人不存在或数据库操作失败
-/// 
-/// 副作用：
-/// - 删除该通讯人的所有标签关联
-/// - 删除该通讯人的所有事件记录
-Future<void> deleteContact(String id);
-```
-
-**示例**:
-```dart
-try {
-  await contactService.deleteContact('abc123');
-  print('删除成功');
-} on DatabaseException catch (e) {
-  print('删除失败: ${e.message}');
-}
-```
-
----
-
-#### 6. 按关键词搜索
-
-```dart
-/// 全文搜索通讯人
-/// 
-/// 参数：
-/// - [keyword] 搜索关键词
-///   搜索范围：name、phone、email、address、notes
-/// 
-/// 返回值：
-/// - 匹配的通讯人列表（按相关度排序）
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-/// 
-/// 搜索特性：
-/// - 不区分大小写
-/// - 支持模糊匹配（SQL LIKE）
-/// - 空关键词返回所有通讯人
-Future<List<Contact>> searchByKeyword(String keyword);
-```
-
-**示例**:
-```dart
-final results = await contactService.searchByKeyword('张三');
-print('搜索到${results.length}个结果');
-```
-
----
-
-#### 7. 按标签搜索
-
-```dart
-/// 按标签搜索通讯人
-/// 
-/// 参数：
-/// - [tagIds] 标签ID列表
-/// - [mode] 搜索模式（OR 或 AND），默认为OR
-///   - SearchMode.or: 返回包含任意一个标签的通讯人
-///   - SearchMode.and: 返回同时包含所有标签的通讯人
-/// 
-/// 返回值：
-/// - 符合条件的通讯人列表
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-/// - [ValidationException] 如果tagIds为空
-/// 
-/// 示例：
-/// - 搜索标签为['family', 'close_friend']的联系人
-///   OR模式: 返回有family标签或close_friend标签的人
-///   AND模式: 返回同时有两个标签的人
-Future<List<Contact>> searchByTags(
-  List<String> tagIds, {
-  SearchMode mode = SearchMode.or,
-});
-
-enum SearchMode { or, and }
-```
-
-**示例**:
-```dart
-// OR搜索：包含任意标签
-final results1 = await contactService.searchByTags(
-  ['tag-001', 'tag-002'],
-  mode: SearchMode.or,
-);
-print('搜索到${results1.length}个结果');
-
-// AND搜索：同时包含所有标签
-final results2 = await contactService.searchByTags(
-  ['tag-001', 'tag-002'],
-  mode: SearchMode.and,
-);
-print('搜索到${results2.length}个结果');
-```
-
----
-
-#### 8. 组合搜索
-
-```dart
-/// 组合搜索（关键词 + 标签）
-/// 
-/// 参数：
-/// - [keyword] 搜索关键词（可选）
-/// - [tagIds] 标签ID列表（可选）
-/// - [tagMode] 标签搜索模式（OR 或 AND）
-/// 
-/// 返回值：
-/// - 同时满足关键词和标签条件的通讯人列表
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-/// 
-/// 逻辑：
-/// - 如果只提供keyword：按关键词搜索
-/// - 如果只提供tagIds：按标签搜索
-/// - 如果两者都提供：返回同时满足条件的结果（AND逻辑）
-Future<List<Contact>> combinedSearch({
-  String? keyword,
-  List<String>? tagIds,
-  SearchMode tagMode = SearchMode.or,
-});
-```
-
-**示例**:
-```dart
-final results = await contactService.combinedSearch(
-  keyword: '张三',
-  tagIds: ['tag-001'],
-  tagMode: SearchMode.or,
-);
-```
-
----
-
-## TagService API
-
-### 概述
-处理标签相关的业务逻辑。
-
-### 方法签名
-
-#### 1. 获取所有标签
-
-```dart
-/// 获取所有标签
-/// 
-/// 返回值：
-/// - 标签列表（按创建时间升序）
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-Future<List<Tag>> getTags();
-```
-
----
-
-#### 2. 创建标签
-
-```dart
-/// 创建新标签
-/// 
-/// 参数：
-/// - [tag] 待创建的标签对象
-/// 
-/// 返回值：
-/// - 创建成功的标签对象（包含生成的id）
-/// 
-/// 异常：
-/// - [ValidationException] 如果标签名称为空或重复
-/// - [DatabaseException] 如果数据库操作失败
-/// 
-/// 业务规则：
-/// - 标签名称必填且唯一
-/// - 颜色为可选（默认随机颜色）
-Future<Tag> createTag(Tag tag);
-```
-
----
-
-#### 3. 更新标签
-
-```dart
-/// 更新标签信息
-/// 
-/// 参数：
-/// - [tag] 更新后的标签对象
-/// 
-/// 返回值：
-/// - 更新后的标签对象
-/// 
-/// 异常：
-/// - [ValidationException] 如果标签名称与其他标签重复
-/// - [DatabaseException] 如果标签不存在或操作失败
-Future<Tag> updateTag(Tag tag);
-```
-
----
-
-#### 4. 删除标签
-
-```dart
-/// 删除标签
-/// 
-/// 参数：
-/// - [id] 待删除标签的ID
-/// 
-/// 异常：
-/// - [DatabaseException] 如果标签不存在或操作失败
-/// 
-/// 副作用：
-/// - 删除所有使用该标签的通讯人关联
-Future<void> deleteTag(String id);
-```
-
----
-
-#### 5. 为通讯人添加标签
-
-```dart
-/// 为通讯人添加标签
-/// 
-/// 参数：
-/// - [contactId] 通讯人ID
-/// - [tagId] 标签ID
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-/// - [ValidationException] 如果该标签已添加给该通讯人
-/// 
-/// 业务规则：
-/// - 同一个标签不能添加两次
-Future<void> addTagToContact(String contactId, String tagId);
-```
-
----
-
-#### 6. 从通讯人移除标签
-
-```dart
-/// 从通讯人移除标签
-/// 
-/// 参数：
-/// - [contactId] 通讯人ID
-/// - [tagId] 标签ID
-/// 
-/// 异常：
-/// - [DatabaseException] 如果操作失败
-Future<void> removeTagFromContact(String contactId, String tagId);
-```
-
----
-
-#### 7. 获取通讯人的所有标签
-
-```dart
-/// 获取某个通讯人拥有的所有标签
-/// 
-/// 参数：
-/// - [contactId] 通讯人ID
-/// 
-/// 返回值：
-/// - 标签列表
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-Future<List<Tag>> getContactTags(String contactId);
-```
-
----
-
-#### 8. 获取使用某标签的通讯人数量
-
-```dart
-/// 获取使用某标签的通讯人数量
-/// 
-/// 参数：
-/// - [tagId] 标签ID
-/// 
-/// 返回值：
-/// - 使用该标签的通讯人数量
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-Future<int> getContactCountByTag(String tagId);
-```
-
----
-
-## EventService API
-
-### 概述
-处理事件和事件类型相关的业务逻辑。
-
-### 方法签名
-
-#### 1. 获取所有事件类型
-
-```dart
-/// 获取所有预设的事件类型
-/// 
-/// 返回值：
-/// - 事件类型列表
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-Future<List<EventType>> getEventTypes();
-```
-
----
-
-#### 2. 创建事件类型
-
-```dart
-/// 创建新的事件类型
-/// 
-/// 参数：
-/// - [eventType] 事件类型对象
-/// 
-/// 返回值：
-/// - 创建成功的事件类型
-/// 
-/// 异常：
-/// - [ValidationException] 如果事件类型名称重复或为空
-/// - [DatabaseException] 如果数据库操作失败
-Future<EventType> createEventType(EventType eventType);
-```
-
----
-
-#### 3. 获取通讯人的所有事件
-
-```dart
-/// 获取某个通讯人的所有事件
-/// 
-/// 参数：
-/// - [contactId] 通讯人ID
-/// 
-/// 返回值：
-/// - 事件列表（按日期升序）
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-Future<List<ContactEvent>> getContactEvents(String contactId);
-```
-
----
-
-#### 4. 创建事件
-
-```dart
-/// 为通讯人创建新的时间节点事件
-/// 
-/// 参数：
-/// - [event] 事件对象
-/// 
-/// 返回值：
-/// - 创建成功的事件对象
-/// 
-/// 异常：
-/// - [ValidationException] 如果输入数据不合法
-/// - [DatabaseException] 如果数据库操作失败
-/// 
-/// 业务规则：
-/// - date 字段格式必须为 YYYY-MM-DD
-/// - reminderDays 范围 0-365
-/// - 同一联系人同一类型只能有一个事件
-Future<ContactEvent> createEvent(ContactEvent event);
-```
-
----
-
-#### 5. 更新事件
-
-```dart
-/// 更新事件信息
-/// 
-/// 参数：
-/// - [event] 更新后的事件对象
-/// 
-/// 返回值：
-/// - 更新后的事件对象
-/// 
-/// 异常：
-/// - [ValidationException] 如果输入数据不合法
-/// - [DatabaseException] 如果事件不存在或操作失败
-Future<ContactEvent> updateEvent(ContactEvent event);
-```
-
----
-
-#### 6. 删除事件
-
-```dart
-/// 删除事件
-/// 
-/// 参数：
-/// - [id] 事件ID
-/// 
-/// 异常：
-/// - [DatabaseException] 如果事件不存在或操作失败
-Future<void> deleteEvent(String id);
-```
-
----
-
-#### 7. 获取即将发生的事件
-
-```dart
-/// 获取指定天数内即将发生的事件
-/// 
-/// 参数：
-/// - [days] 天数范围（默认30天）
-/// 
-/// 返回值：
-/// - 按日期升序的事件列表及其关联的通讯人信息
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-/// 
-/// 说明：
-/// - 仅返回启用提醒的事件
-/// - 包含今天的事件
-Future<List<UpcomingEvent>> getUpcomingEvents({int days = 30});
-
-class UpcomingEvent {
-  final ContactEvent event;
-  final Contact contact;
-  final EventType eventType;
-  final int daysUntil;
-  
-  UpcomingEvent({
-    required this.event,
-    required this.contact,
-    required this.eventType,
-    required this.daysUntil,
-  });
-}
-```
-
----
-
-#### 8. 获取本月即将生日的人
-
-```dart
-/// 获取本月即将生日的通讯人
-/// 
-/// 返回值：
-/// - 本月即将生日的通讯人列表（按生日日期升序）
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-Future<List<Contact>> getBirthdaysThisMonth();
-```
-
----
-
-#### 9. 获取已过期的未提醒事件
-
-```dart
-/// 获取已过期但尚未处理的事件
-/// 
-/// 返回值：
-/// - 已过期事件列表
-/// 
-/// 异常：
-/// - [DatabaseException] 如果数据库操作失败
-/// 
-/// 用途：
-/// - 用于提醒补偿逻辑
-Future<List<ContactEvent>> getExpiredUnremindedEvents();
-```
-
----
-
-## DatabaseService API
-
-### 概述
-处理数据库初始化、迁移和底层操作。
-
-### 方法签名
-
-#### 1. 获取数据库实例
-
-```dart
-/// 获取单例数据库实例
-/// 
-/// 首次调用会初始化数据库，后续调用返回缓存的实例
-/// 
-/// 返回值：
-/// - SQLite Database 实例
-/// 
-/// 异常：
-/// - [DatabaseException] 如果初始化失败
-Future<Database> get database;
-```
-
----
-
-#### 2. 初始化数据库
-
-```dart
-/// 初始化数据库（内部调用）
-/// 
-/// 创建数据库文件并执行初始化SQL
-/// 
-/// 异常：
-/// - [DatabaseException] 如果操作失败
-Future<Database> _initDatabase();
-```
-
----
-
-#### 3. 关闭数据库
-
-```dart
-/// 关闭数据库连接
-/// 
-/// 异常：
-/// - [DatabaseException] 如果操作失败
-Future<void> closeDatabase();
-```
-
----
-
-## 状态管理 (Provider) API
-
-### ContactProvider
-
-```dart
-class ContactProvider extends ChangeNotifier {
-  // 状态
-  List<Contact> get contacts;
-  bool get loading;
-  String? get error;
-  Contact? get currentContact;
-  
-  // 操作方法
-  Future<void> loadContacts();
-  Future<void> createContact(Contact contact);
-  Future<void> updateContact(Contact contact);
+abstract class ContactService {
+  Future<List<Contact>> getContacts();
+  Future<Contact> getContact(String id);
+  Future<Contact> createContact(ContactDraft draft);
+  Future<Contact> updateContact(Contact contact, {List<String>? tagIds});
   Future<void> deleteContact(String id);
-  Future<void> searchByKeyword(String keyword);
-  Future<void> searchByTags(List<String> tagIds, SearchMode mode);
-  void setCurrentContact(Contact contact);
-  void clearError();
+  Future<List<Contact>> searchByKeyword(String keyword);
+  Future<List<Contact>> searchByTags(List<String> tagIds);
+  Future<List<Event>> getContactEvents(String contactId);
+  Future<List<Tag>> getContactTags(String contactId);
 }
 ```
 
-### TagProvider
+规则：
+- 联系人名称必填
+- `updateContact` 可顺带同步标签集合
+
+### TagService
+职责：标签 CRUD 与联系人打标。
 
 ```dart
-class TagProvider extends ChangeNotifier {
-  List<Tag> get tags;
-  bool get loading;
-  String? get error;
-  
-  Future<void> loadTags();
-  Future<void> createTag(Tag tag);
-  Future<void> updateTag(Tag tag);
+abstract class TagService {
+  Future<List<Tag>> getTags();
+  Future<Tag> getTag(String id);
+  Future<Tag> createTag(TagDraft draft);
+  Future<Tag> updateTag(Tag tag);
   Future<void> deleteTag(String id);
+  Future<void> addTagToContact(String contactId, String tagId);
+  Future<void> removeTagFromContact(String contactId, String tagId);
+  Future<List<Tag>> getContactTags(String contactId);
+  Future<int> getContactCountByTag(String tagId);
 }
 ```
 
-### EventProvider
+### EventService
+职责：事件本体、事件类型、参与人写侧规则。
 
 ```dart
-class EventProvider extends ChangeNotifier {
-  List<EventType> get eventTypes;
-  List<ContactEvent> get events;
-  bool get loading;
-  String? get error;
-  
-  Future<void> loadEventTypes();
-  Future<void> loadEvents(String contactId);
-  Future<void> createEvent(ContactEvent event);
-  Future<void> updateEvent(ContactEvent event);
+abstract class EventService {
+  Future<List<EventType>> getEventTypes();
+  Future<EventType> createEventType(EventTypeDraft draft);
+  Future<List<Event>> getEvents();
+  Future<Event> getEvent(String id);
+  Future<Event> createEvent(EventDraft draft);
+  Future<Event> updateEvent(Event event);
   Future<void> deleteEvent(String id);
-  Future<void> loadUpcomingEvents();
+  Future<void> setParticipants(String eventId, List<String> contactIds, {Map<String, String>? participantRoles});
+  Future<void> addParticipant(String eventId, String contactId, {String? role});
+  Future<void> removeParticipant(String eventId, String contactId);
+  Future<List<Contact>> getParticipants(String eventId);
+  Future<Map<String, List<Contact>>> getParticipantsByEventIds(List<String> eventIds);
+  Future<List<Event>> searchEvents({String? keyword, String? eventTypeId});
+  Future<List<Event>> getUpcomingEvents({int days = 30});
 }
 ```
 
----
+规则：
+- 事件标题必填
+- 事件至少保留一个参与人
+- 校验时间范围合法性
+- 当前不包含 `status` 参数与状态流转规则
 
-## 接口使用示例
-
-### 完整使用流程示例
+### SummaryService
+职责：每日总结 CRUD、日期唯一约束、行动项提取。
 
 ```dart
-// 1. 初始化服务
-final databaseService = DatabaseService();
-final contactRepository = ContactRepository(databaseService);
-final contactService = ContactService(contactRepository);
-
-// 2. 创建通讯人
-final newContact = await contactService.createContact(
-  Contact(
-    id: '',
-    name: '李四',
-    phone: '+86-13900000000',
-    email: 'lisi@example.com',
-    address: '上海市浦东新区',
-    notes: '工作同事',
-    createdAt: DateTime.now(),
-    updatedAt: DateTime.now(),
-  ),
-);
-
-// 3. 添加标签
-await tagService.addTagToContact(newContact.id, 'tag-001');
-
-// 4. 创建事件
-final event = await eventService.createEvent(
-  ContactEvent(
-    id: '',
-    contactId: newContact.id,
-    eventTypeId: 'evt-type-001',
-    date: '1985-06-15',
-    reminderEnabled: true,
-    reminderDays: 3,
-    createdAt: DateTime.now(),
-    updatedAt: DateTime.now(),
-  ),
-);
-
-// 5. 查询
-final upcoming = await eventService.getUpcomingEvents(days: 30);
-final tagged = await contactService.searchByTags(
-  ['tag-001'],
-  mode: SearchMode.or,
-);
+abstract class SummaryService {
+  Future<List<DailySummary>> getSummaries();
+  Future<List<DailySummary>> searchByKeyword(String keyword);
+  Future<DailySummary?> getSummaryByDate(DateTime summaryDate);
+  Future<DailySummary> getSummary(String id);
+  Future<DailySummary> createSummary(DailySummaryDraft draft);
+  Future<DailySummary> updateSummary(DailySummary summary);
+  Future<void> deleteSummary(String id);
+  Future<List<ActionItem>> extractActionItemsFromSummary(String summaryId);
+}
 ```
 
----
+规则：
+- `todaySummary` 与 `tomorrowPlan` 至少填一项
+- 每天只允许一条总结
 
-## 版本历史
+### AttachmentService
+职责：附件落盘、元数据写入、owner 绑定、打开、删除。
 
-| 版本 | 日期 | 变更 |
-|------|------|------|
-| 1.0 | 2026-03-06 | 初始版本 |
+```dart
+abstract class AttachmentService {
+  Future<List<Attachment>> getAllAttachments();
+  Future<Attachment> saveAttachment(AttachmentDraft draft);
+  Future<Attachment> getAttachment(String id);
+  Future<Attachment> updateAttachment(Attachment attachment);
+  Future<void> deleteAttachment(String id);
+  Future<void> openAttachment(Attachment attachment);
+  Future<void> removeAttachmentFromOwner(String attachmentId, AttachmentOwnerType ownerType, String ownerId, {bool deleteIfOrphan = false});
+  Future<void> linkAttachmentToEvent(String attachmentId, String eventId, {String? label});
+  Future<void> linkAttachmentToSummary(String attachmentId, String summaryId, {String? label});
+  Future<void> unlinkAttachment(String attachmentId, AttachmentOwnerType ownerType, String ownerId);
+  Future<List<Attachment>> getEventAttachments(String eventId);
+  Future<Map<String, List<Attachment>>> getEventAttachmentsByEventIds(List<String> eventIds);
+  Future<List<Attachment>> getSummaryAttachments(String summaryId);
+  Future<Map<String, List<Attachment>>> getSummaryAttachmentsBySummaryIds(List<String> summaryIds);
+}
+```
 
----
+规则：
+- 附件源文件必须存在
+- 直接删除前会检查是否仍有 owner 关联
+- `openAttachment` 按平台走系统默认打开方式
 
-**最后更新**: 2026年3月6日
+## Read Service 契约
 
+### ContactReadService
+职责：联系人详情页只读聚合。
+
+```dart
+abstract class ContactReadService {
+  Future<ContactDetailReadModel> getContactDetail(String contactId);
+}
+
+class ContactDetailReadModel {
+  final Contact contact;
+  final List<Tag> tags;
+  final List<Event> events;
+  final List<Attachment> attachments;
+  final Map<String, String> eventTypeNames;
+}
+```
+
+说明：
+- 当前不包含独立 summaries 字段
+- 联系人详情中的附件展示来自事件附件聚合
+
+### EventReadService
+职责：事件列表与详情页只读聚合。
+
+```dart
+abstract class EventReadService {
+  Future<EventsListReadModel> getEventsList({String? contactId});
+  Future<EventsListReadModel> searchEventsList({String? contactId, String? keyword, String? eventTypeId});
+  Future<EventDetailReadModel> getEventDetail(String eventId);
+}
+```
+
+读模型：
+
+```dart
+class EventsListReadModel {
+  final Contact? contact;
+  final List<EventListItemReadModel> items;
+}
+
+class EventListItemReadModel {
+  final Event event;
+  final String? eventTypeName;
+  final List<String> participantNames;
+}
+
+class EventDetailReadModel {
+  final Event event;
+  final String? eventTypeName;
+  final List<Contact> participants;
+  final List<EventParticipantDetailReadModel> participantEntries;
+  final List<Attachment> attachments;
+  final Contact? createdByContact;
+}
+```
+
+说明：
+- 当前事件详情 read model 不包含每日总结列表
+- 事件列表搜索支持 `keyword + eventTypeId`
+
+## Provider 契约
+
+### 基础设施
+- `BaseProvider`：统一 `loading`、`initialized`、`error`、`execute()`
+- `ProviderError`：将异常转换为可展示错误结构
+
+### 已实现 Provider
+- `ContactProvider`
+- `ContactDetailProvider`
+- `EventProvider`
+- `EventsListProvider`
+- `EventDetailProvider`
+- `TagProvider`
+- `SummaryProvider`
+- `AttachmentProvider`
+- `FilesProvider`
+- `GlobalSearchProvider`
+
+### 当前关注点
+
+#### EventsListProvider
+- 持有关键字
+- 持有选中的事件类型过滤器
+- 依赖 `EventReadService + EventService`
+
+#### SummaryProvider
+- 管理列表、当前详情、行动项
+- 支持关键字过滤与按日期加载
+
+#### FilesProvider
+- 管理文件库附件列表与关键字过滤
+
+#### GlobalSearchProvider
+- 聚合联系人、事件、每日总结
+- 承担命中排序与评分逻辑
+
+## Repository 契约
+
+当前 repository 为 SQLite 实现，主要职责如下：
+
+- `ContactRepository`：联系人 CRUD、关键字搜索、按标签搜索
+- `TagRepository`：标签 CRUD、联系人标签关系
+- `EventRepository`：事件 CRUD、事件类型、参与人、搜索、即将发生事件
+- `SummaryRepository`：每日总结 CRUD、按日期读取、关键字搜索
+- `AttachmentRepository`：附件 CRUD、owner 关联、批量读取、关联计数
+
+## 当前需要特别避免的过期说法
+
+1. 不要再把当前总结主流程描述为 `event_summaries` 驱动
+2. 不要再把 `EventStatus` 写成当前活跃接口的一部分
+3. 不要再把 `TagProvider`、`SummaryProvider`、`FilesProvider` 说成“尚未实现”

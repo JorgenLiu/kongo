@@ -1,326 +1,133 @@
-# Kongo - 通讯录和日程管理应用
+# Kongo
 
-一个跨平台的Flutter应用，用于管理通讯人信息和重要日期事件。
+Kongo 是一个基于 Flutter + Dart + SQLite 的本地优先关系管理应用，围绕联系人、事件、每日总结与附件沉淀组织个人工作信息。当前以 macOS 为主要开发和验证平台，iOS 与 Windows 工程已生成，但尚未完成同等强度的端到端验证。
 
-## 📱 应用特性
+## 当前产品状态
 
-### 核心功能
-- **通讯人管理**: 创建、编辑、删除通讯人信息
-- **智能标签**: 为通讯人添加多个标签，支持灵活搜索
-- **日程管理**: 管理生日、会面日期、结婚纪念日等重要时间节点
-- **智能搜索**: 支持全文搜索和多标签组合搜索
-- **提醒功能**: 设置重要日期的提前提醒
+### 已完成的主能力
+- 联系人：列表、关键字搜索、创建、编辑、删除、详情聚合视图
+- 标签：创建、编辑、删除、联系人打标、列表检索
+- 事件：列表、关键字检索、事件类型过滤、创建、编辑、删除、详情页、参与人角色维护
+- 每日总结：列表、按关键字检索、按日期唯一创建、编辑、删除、行动项提取
+- 附件：文件复制入库、事件/总结关联、打开、解绑、删除、文件库总览
+- 全局检索：跨联系人、事件、每日总结统一搜索，包含命中词高亮与排序
+- 读侧聚合：`ContactReadService` 与 `EventReadService`
+- 统一 Provider 基础设施：结构化错误、加载态、页面级状态管理
+- 测试基线：provider、service、read service、widget、SQLite FFI harness
 
-### 支持平台
-- ✅ macOS (优先实现)
-- 🚧 Windows (计划中)
-- 🚧 iOS (计划中)
+### 当前壳导航
+主导航当前包含 5 个一级页面：
 
-## 🛠 技术栈
+1. 日程
+2. 通讯录
+3. 检索
+4. 总结
+5. 设置
 
-| 技术         | 说明       |
-| ------------ | ---------- |
-| **Flutter**  | 3.0+       |
-| **Dart**     | 2.18+      |
-| **SQLite**   | 本地数据库 |
-| **Provider** | 状态管理   |
-| **sqflite**  | SQLite驱动 |
+标签管理与文件库已实现，但当前通过次级入口进入，而不是一级导航页。
 
-## 📚 项目文档
+### 当前仍在演进中的部分
+- 联系人详情中的“附件模块”仍是轻量入口提示，尚未扩展为独立联系人附件工作台
+- 文件库目前以检索和打开为主，尚未补齐排序、筛选、批量操作与预览增强
+- 提醒能力已保留事件字段，但尚未打通 macOS / Windows / iOS 的系统提醒闭环
+- 数据库仍保留 `events.status` 兼容列，但当前运行时事件模型与 UI 已不再使用“事件状态”概念
 
-本项目包含完整的规划和设计文档：
+## 技术栈
 
-### 核心文档
-- **[PROJECT_PLAN.md](PROJECT_PLAN.md)** - 项目总体规划
-  - 功能需求分析
-  - 数据库设计
-  - 项目结构规划
-  - 开发阶段计划
+### 运行时依赖
+- Flutter / Dart
+- provider
+- sqflite
+- path / path_provider
+- file_selector
+- uuid
+- lpinyin
 
-- **[DATABASE_DESIGN.md](DATABASE_DESIGN.md)** - 数据库详细设计
-  - 数据表结构
-  - ER图和关系
-  - SQL查询示例
-  - 数据备份与恢复
+### 测试依赖
+- flutter_test
+- sqflite_common_ffi
 
-- **[API_SPECIFICATION.md](API_SPECIFICATION.md)** - API接口规范
-  - Service接口设计
-  - Repository接口设计
-  - Provider状态管理
-  - 使用示例
+## 快速开始
 
-- **[UI_DESIGN_GUIDE.md](UI_DESIGN_GUIDE.md)** - UI/UX设计规范
-  - 色彩系统
-  - 排版规范
-  - 组件设计
-  - 页面布局
+### 环境约束
+- 已验证开发环境：macOS Ventura 13.7.8 Intel
+- Flutter SDK 路径：`~/development/flutter`
+- 可能访问 Google / Flutter / pub 远端资源的命令，先执行 `source ~/.zshrc && proxyon`
+- 当前机器优先使用 Swift Package Manager 路径，不建议依赖 CocoaPods
 
-- **[DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)** - 开发指南
-  - 环境设置
-  - 架构设计
-  - 编码规范
-  - 测试指南
+### 常用命令
 
-- **[QUICKSTART.md](QUICKSTART.md)** - 快速开始指南
-  - 环境检查
-  - 项目初始化
-  - 依赖安装
-  - 运行步骤
-
-## 🚀 快速开始
-
-### 前置条件
 ```bash
-# 检查Flutter安装
-flutter --version
-
-# 检查Dart安装
-dart --version
-
-# 检查开发环境
-flutter doctor
+source ~/.zshrc && cd /Users/jordan.liu/dev/kongo && flutter pub get
+source ~/.zshrc && cd /Users/jordan.liu/dev/kongo && flutter analyze
+source ~/.zshrc && cd /Users/jordan.liu/dev/kongo && flutter test
+source ~/.zshrc && cd /Users/jordan.liu/dev/kongo && flutter run -d macos
 ```
 
-### 安装依赖
+### 构建与打开 macOS 客户端
+
 ```bash
-cd kongo
-flutter pub get
+source ~/.zshrc && cd /Users/jordan.liu/dev/kongo && flutter build macos
+open /Users/jordan.liu/dev/kongo/build/macos/Build/Products/Release/kongo.app
 ```
 
-### 运行应用
-```bash
-# macOS
-flutter run -d macos
+## 项目结构
 
-# iOS模拟器
-flutter run -d "iPhone 14"
-
-# 指定Release模式
-flutter run --release
-```
-
-## 📖 项目结构
-
-```
+```text
 kongo/
+├── doc/                      # 项目文档与设计说明
 ├── lib/
-│   ├── main.dart                    # 应用入口
-│   ├── config/                      # 应用配置
-│   ├── models/                      # 数据模型
-│   ├── services/                    # 业务逻辑服务
-│   ├── repositories/                # 数据访问层
-│   ├── providers/                   # 状态管理
-│   ├── screens/                     # 页面
-│   ├── widgets/                     # 可复用组件
-│   ├── utils/                       # 工具函数
-│   └── exceptions/                  # 异常定义
-├── test/                            # 测试目录
-├── PROJECT_PLAN.md                  # 项目规划
-├── DATABASE_DESIGN.md               # 数据库设计
-├── API_SPECIFICATION.md             # API规范
-├── UI_DESIGN_GUIDE.md               # UI设计
-├── DEVELOPMENT_GUIDE.md             # 开发指南
-├── QUICKSTART.md                    # 快速开始
-└── pubspec.yaml                     # 项目配置
+│   ├── config/              # 主题、颜色、尺寸 token
+│   ├── exceptions/          # 结构化异常
+│   ├── models/              # 领域模型与 draft
+│   ├── providers/           # 页面与功能状态管理
+│   ├── repositories/        # SQLite 持久化
+│   ├── screens/             # 页面编排层
+│   ├── services/            # 业务服务与 read-side 服务
+│   ├── utils/               # 格式化与辅助函数
+│   ├── widgets/             # 复用组件
+│   └── main.dart            # 应用入口
+├── test/                    # provider / service / widget 测试
+├── macos/                   # 当前已验证平台
+├── ios/                     # 已生成工程，待完整验证
+├── windows/                 # 已生成工程，待完整验证
+└── pubspec.yaml
 ```
 
-## 🗄️ 数据模型
+## 文档入口
 
-### 核心实体
+建议按下面顺序阅读：
 
-#### Contact (通讯人)
-```dart
-- id: String (主键)
-- name: String (姓名)
-- phone: String? (电话)
-- email: String? (邮箱)
-- address: String? (地址)
-- notes: String? (备注)
-- avatar: Blob? (头像)
-- createdAt: DateTime
-- updatedAt: DateTime
-- tags: List<Tag> (标签)
-- events: List<ContactEvent> (事件)
-```
+1. `doc/INDEX.md`：文档导航与当前项目状态
+2. `doc/PROJECT_PLAN.md`：产品定位、现状、路线图
+3. `doc/DATABASE_DESIGN.md`：数据库结构、迁移与兼容性说明
+4. `doc/API_SPECIFICATION.md`：Repository / Service / Read Service / Provider 契约
+5. `doc/UI_DESIGN_GUIDE.md`：当前已落地的视觉 token 与交互规范
+6. `doc/DEVELOPMENT_GUIDE.md`：环境、架构、约束、测试与开发方式
 
-#### Tag (标签)
-```dart
-- id: String (主键)
-- name: String (标签名)
-- color: String? (颜色)
-- createdAt: DateTime
-```
+## 测试
 
-#### ContactEvent (事件)
-```dart
-- id: String (主键)
-- contactId: String (外键)
-- eventTypeId: String (外键)
-- date: String (YYYY-MM-DD)
-- reminderEnabled: bool (是否提醒)
-- reminderDays: int (提前天数)
-- notes: String? (备注)
-- createdAt: DateTime
-- updatedAt: DateTime
-```
-
-## 🎯 开发阶段
-
-### Phase 1: 项目初始化与基础架构 (第1-2周)
-- [ ] 创建Flutter项目
-- [ ] 配置项目结构
-- [ ] 设置依赖包
-- [ ] 实现数据库初始化
-
-### Phase 2: 数据模型与数据库 (第2-3周)
-- [ ] 设计和实现数据模型
-- [ ] 实现SQLite数据库操作
-- [ ] 创建Repository层
-- [ ] 编写单元测试
-
-### Phase 3: 核心业务逻辑层 (第3-4周)
-- [ ] 实现Service层
-- [ ] 实现Provider状态管理
-- [ ] 业务逻辑单元测试
-
-### Phase 4: UI开发 (第4-6周)
-- [ ] 通讯人列表页面
-- [ ] 通讯人详情页面
-- [ ] 标签管理页面
-- [ ] 事件管理页面
-- [ ] 搜索功能页面
-
-### Phase 5: 功能集成与测试 (第6-7周)
-- [ ] 端到端测试
-- [ ] 性能优化
-- [ ] Bug修复
-
-### Phase 6: macOS适配与发布 (第7-8周)
-- [ ] macOS平台特性适配
-- [ ] 打包与签名
-- [ ] 应用分发
-
-## 📋 第一版需求清单
-
-### 通讯人管理
-- [x] 创建通讯人
-- [x] 编辑通讯人信息
-- [x] 删除通讯人
-- [x] 查看通讯人列表
-
-### 标签系统
-- [x] 为通讯人添加标签
-- [x] 管理标签
-- [x] 单个标签查找
-- [x] 多个标签组合查找（OR/AND）
-
-### 时间节点管理
-- [x] 创建时间节点（生日、会面日期等）
-- [x] 编辑时间节点
-- [x] 查看时间节点
-- [x] 删除时间节点
-
-### 数据持久化
-- [x] SQLite本地存储
-- [x] 数据备份与恢复接口设计
-
-## 🎨 UI/UX设计
-
-### 色彩方案
-- **Primary**: #2196F3 (蓝色)
-- **Secondary**: #03DAC6 (青色)
-- **Error**: #B00020 (红色)
-- **Success**: #4CAF50 (绿色)
-
-### 组件
-- 响应式设计
-- Material 3 设计规范
-- 深色模式支持
-- 无障碍设计
-
-详见 [UI_DESIGN_GUIDE.md](UI_DESIGN_GUIDE.md)
-
-## 🧪 测试
+### 建议执行顺序
 
 ```bash
-# 运行所有测试
-flutter test
-
-# 生成覆盖率报告
-flutter test --coverage
-
-# 特定测试文件
-flutter test test/services/contact_service_test.dart
+source ~/.zshrc && cd /Users/jordan.liu/dev/kongo && flutter analyze
+source ~/.zshrc && cd /Users/jordan.liu/dev/kongo && flutter test
 ```
 
-目标覆盖率:
-- Service层: ≥90%
-- Repository层: ≥85%
-- 总体: ≥80%
+### 已存在的测试覆盖方向
+- Provider 状态流
+- Repository / Service 基础 CRUD 与业务规则
+- Read Service 聚合
+- Shell 导航与关键页面 widget 行为
+- SQLite FFI 本地测试基建
 
-## 🔧 开发工具
+## 关键事实
 
-### 代码质量
-```bash
-# 代码分析
-dart analyze
+- 当前总结模块的真实模型是“每日总结”`DailySummary`，而不是事件内嵌纪要流
+- 当前全局检索覆盖联系人、事件、每日总结，不含附件独立结果卡片
+- 当前应用主题已采用暖棕色 Agenda 风格，而非早期蓝青色方案
+- 当前事件运行时模型已移除 `status` 字段；数据库保留兼容列，仅用于历史迁移与兼容
 
-# 代码格式化
-dart format lib/
+## 许可证
 
-# Flutter Lint
-flutter analyze
-```
-
-### 调试
-```bash
-# 启用verbose日志
-flutter run --verbose
-
-# 使用DevTools
-flutter pub global activate devtools
-devtools
-```
-
-## 📦 依赖管理
-
-### 核心依赖
-- `provider: ^6.0.0` - 状态管理
-- `sqflite: ^2.3.0` - SQLite数据库
-- `uuid: ^4.0.0` - UUID生成
-- `intl: ^0.19.0` - 国际化
-
-### 开发工具
-- `flutter_lints: ^3.0.0` - Lint规则
-- `mockito: ^5.4.0` - Mock框架
-
-更新依赖:
-```bash
-flutter pub upgrade
-flutter pub outdated
-```
-
-## 📝 命名规范
-
-### 文件名
-- 使用snake_case: `contact_service.dart`
-
-### 类名
-- 使用PascalCase: `class ContactService`
-
-### 变量和方法
-- 使用camelCase: `var userName`
-
-### 常量
-- 大写带下划线: `const String APP_NAME`
-
-详见 [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md)
-
-## 🐛 问题报告
-
-发现bug或有功能建议，请提交Issue或Pull Request。
-
-## 📄 许可证
-
-[查看LICENSE文件](LICENSE)
-An address list App with agenda management. 
+详见 `LICENSE`。

@@ -1,9 +1,11 @@
 # Miscellaneous
+.DS_Store
 *.class
 *.lock
 *.log
 *.pyc
 *.swp
+.orig
 .buildlog/
 .history
 
@@ -106,6 +108,24 @@ unlinked_spec.ds
 
 # Coverage
 coverage/
+
+# IDE / Editor
+.idea/
+*.iml
+.metadata
+.vscode/*
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Local test and native caches
+test_cache/
+native_assets/
+
+# Xcode user-specific files
+**/*.xcuserstate
+**/DerivedData/
 
 # Symbols
 app.*.symbols
