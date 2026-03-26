@@ -184,10 +184,11 @@ class _ScheduleSection extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         ...items.map(
           (item) => Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: EventListItemCard(
               event: item.event,
               eventTypeName: item.eventTypeName,
+              eventTypeColor: item.eventTypeColor,
               participantNames: item.participantNames,
               onTap: () => onItemTap(item),
             ),

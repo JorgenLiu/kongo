@@ -19,6 +19,7 @@ class EventDetailInfoSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
+      icon: Icons.info_outline,
       title: '基础信息',
       child: Column(
         children: [

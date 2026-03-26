@@ -4,24 +4,24 @@
 
 - 数据库类型：SQLite
 - 数据库文件：`kongo.db`
-- 当前 schema 版本：`3`
-- 当前持久化入口：`lib/services/database_service.dart`
-
-当前数据库既承载现用模型，也保留少量历史兼容结构。文档需要同时说明“当前真实读写表”与“兼容遗留项”。
+- 当前 schema 版本：8（v9 迁移待执行，将新增 `deletedAt` 软删除字段）
+- 持久化入口：`lib/services/database_service.dart`
 
 ## 设计原则
 
-1. 本地优先，所有核心数据默认离线可用
-2. 核心实体用关系表表达，不把复杂聚合直接塞进单表字段
-3. 附件本体存磁盘，数据库只存元数据与关联关系
-4. 迁移优先保证旧数据可升级，再逐步清理兼容字段
+1. 本地优先，核心数据默认离线可用
+2. 复杂关系优先用关系表表达，不把聚合硬塞单表
+3. 附件本体存文件系统，数据库存元数据与关联关系
+4. 迁移优先保证旧数据可升级，再逐步压缩兼容结构
 
 ## 当前主表
 
 ### `contacts`
+
 联系人主表。
 
 关键字段：
+
 - `id`
 - `name`
 - `phone`
@@ -32,59 +32,31 @@
 - `createdAt`
 - `updatedAt`
 
-索引：
-- `idx_contacts_name`
-- `idx_contacts_phone`
-- `idx_contacts_email`
-- `idx_contacts_createdAt`
-
 ### `tags`
-标签主表。
 
-关键字段：
-- `id`
-- `name`，唯一
-- `color`
-- `createdAt`
-- `updatedAt`
-
-索引：
-- `idx_tags_name`
+标签主表，`name` 唯一。
 
 ### `contact_tags`
-联系人与标签的多对多关联表。
 
-关键字段：
-- `id`
-- `contactId`
-- `tagId`
-- `addedAt`
+联系人与标签的多对多关系表。
 
 约束：
+
 - `UNIQUE(contactId, tagId)`
-- 双外键均 `ON DELETE CASCADE`
+- 双外键 `ON DELETE CASCADE`
 
 ### `event_types`
+
 事件类型表。
 
-关键字段：
-- `id`
-- `name`，唯一
-- `icon`
-- `color`
-- `createdAt`
-- `updatedAt`
-
-默认种子：
-- `生日`
-- `会面`
-- `通话`
-- `跟进`
+默认种子：生日、会面、通话、跟进。
 
 ### `events`
+
 事件主表。
 
 关键字段：
+
 - `id`
 - `title`
 - `eventTypeId`
@@ -99,37 +71,28 @@
 - `updatedAt`
 
 兼容字段：
+
 - `status`
 
-重要说明：
-- 数据库层仍保留 `status TEXT NOT NULL DEFAULT 'planned'`
-- 当前 Dart 运行时 `Event` 模型不再映射该字段
-- 当前 UI、Service、Read Service 也不再基于状态做业务判断
-- 因此 `status` 当前应被视为兼容字段，而不是活跃领域字段
+说明：
 
-索引：
-- `idx_events_eventTypeId`
-- `idx_events_status`
-- `idx_events_startAt`
-- `idx_events_createdByContactId`
+- 当前运行时 `Event` 模型不再映射 `status`
+- 当前 UI、Service、Read Service 也不再按状态做业务判断
 
 ### `event_participants`
-事件与联系人的多对多关联表，并承载参与角色。
 
-关键字段：
-- `id`
-- `eventId`
-- `contactId`
-- `role`
-- `addedAt`
+事件与联系人的多对多关系表，同时承载参与角色。
 
 约束：
+
 - `UNIQUE(eventId, contactId)`
 
 ### `daily_summaries`
+
 当前主总结表。
 
 关键字段：
+
 - `id`
 - `summaryDate`，唯一
 - `todaySummary`
@@ -141,125 +104,233 @@
 - `updatedAt`
 
 说明：
-- 当前总结真实模型是 `DailySummary`
-- 一天最多一条总结
-- 文本被拆分为“当日总结”和“明日计划”
 
-索引：
-- `idx_daily_summaries_summaryDate`
-- `idx_daily_summaries_source`
-- `idx_daily_summaries_createdAt`
+- 当前真实总结模型是 `DailySummary`
+- 每天最多一条总结
 
 ### `attachments`
+
 附件元数据表。
 
 关键字段：
+
 - `id`
 - `fileName`
 - `originalFileName`
 - `storagePath`
+- `storageMode`
+- `sourcePath`
+- `managedPath`
+- `snapshotPath`
 - `mimeType`
 - `extension`
 - `sizeBytes`
+- `originalSizeBytes`
+- `managedSizeBytes`
 - `checksum`
 - `previewText`
+- `previewStatus`
+- `previewUpdatedAt`
+- `previewError`
+- `sourceStatus`
+- `sourceLastVerifiedAt`
+- `importPolicy`
 - `createdAt`
 - `updatedAt`
 
 说明：
-- `storagePath` 指向应用私有目录中的真实文件
-- 文件本体由 `AttachmentService` 复制到本地目录
 
-索引：
-- `idx_attachments_fileName`
-- `idx_attachments_mimeType`
-- `idx_attachments_checksum`
+- 当前支持 `managed` / `linked` 两种存储模式
+- `storagePath` 仍保留为兼容字段
+- `previewStatus` / `previewUpdatedAt` / `previewError` 已在 schema 中稳定存在
 
 ### `attachment_links`
+
 附件与 owner 的关联表。
 
-关键字段：
-- `id`
-- `attachmentId`
-- `ownerType`
-- `ownerId`
-- `label`
-- `addedAt`
+当前 `ownerType`：
 
-当前 ownerType：
 - `event`
 - `summary`
 
 约束：
+
 - `UNIQUE(attachmentId, ownerType, ownerId)`
 
-索引：
-- `idx_attachment_links_attachmentId`
-- `idx_attachment_links_owner`
+### `contact_milestones`
 
-### `ai_jobs` 与 `ai_outputs`
-当前为预留表，尚未在主流程中启用。
+联系人重要日期表。
 
-用途：
-- 记录 AI 任务调用元数据
-- 记录 AI 输出内容
+关键字段：
+
+- `id`
+- `contactId`
+- `type`
+- `label`
+- `milestoneDate`
+- `isLunar`
+- `isRecurring`
+- `reminderEnabled`
+- `reminderDaysBefore`
+- `notes`
+- `createdAt`
+- `updatedAt`
+
+说明：
+
+- 用于生日、纪念日、入职日、自定义重要日期等
+- 当前联系人重要日期已进入首页、联系人列表和日历时间节点展示
+- `isLunar` 当前仅做存储，尚未参与日历换算显示
+
+### `app_preferences`
+
+应用偏好表。
+
+关键字段：
+
+- `key`
+- `value`
+- `updatedAt`
+
+说明：
+
+- 当前用于持久化时间节点类别开关
+- 现有 key 包括联系人重要日期与公共纪念日的显示开关
+
+### `todo_groups`
+
+待办组主表。
+
+关键字段：
+
+- `id`
+- `title`
+- `description`
+- `sortOrder`
+- `archivedAt`
+- `createdAt`
+- `updatedAt`
+
+说明：
+
+- 当前用于组织待办组视图
+- 删除组时，组内待办项会级联删除
+
+### `todo_items`
+
+待办项主表。
+
+关键字段：
+
+- `id`
+- `groupId`
+- `parentItemId`
+- `title`
+- `notes`
+- `status`
+- `dueAt`
+- `completedAt`
+- `sourceType`
+- `sourceId`
+- `sortOrder`
+- `createdAt`
+- `updatedAt`
+
+说明：
+
+- 当前支持一级项 / 子项两层结构
+- `sourceType` / `sourceId` 已预留给后续行动项来源映射
+
+### `todo_item_contacts`
+
+待办项与联系人的多对多关系表。
+
+### `todo_item_events`
+
+待办项与事件的多对多关系表。
+
+### `ai_jobs` / `ai_outputs`
+
+AI 任务与输出表，当前为基础设施预留，不是日常主流程核心表。
 
 ## 历史兼容结构
 
 ### `event_summaries`
-这是旧版事件总结表，仅在从 v2 迁移到 v3 时读取与折叠，不再作为当前主模型写入表。
 
-迁移策略：
+这是旧版事件总结表。
 
-1. 读取旧 `event_summaries`
-2. 按 `createdAt` 所在日期归并
-3. 生成新的 `daily_summaries`
-4. 保留最后一条记录的主键与元数据
-5. 把旧附件关联的 `ownerId` 重写到保留的总结 id
+当前状态：
+
+- 仅用于旧版本迁移与兼容
+- 当前不再作为主模型写入
+
+## 当前缺失的结构
+
+以下能力当前尚未进入数据库 schema：
+
+1. **软删除字段 `deletedAt`** — 待 v9 迁移执行。将新增到 `contacts`、`tags`、`events`、`daily_summaries`、`attachments`、`contact_milestones`、`todo_groups`、`todo_items` 共 8 张表，为云同步预埋基础。实施计划见 `PLAN_SCHEMA_MIGRATION_V9.md`。
+2. 外部节点源缓存表
 
 这意味着：
-- 旧事件纪要不会完全原样保留为多条事件级总结
-- 当前产品语义已经收敛为“按日期管理每日总结”
+
+- 当前时间节点类别开关已经进入通用偏好持久化阶段
+- 当前仍缺节气、营销节点等外部节点源缓存或配置结构
 
 ## 当前领域关系
 
 ```text
 contacts ──< contact_tags >── tags
 
+contacts ──< contact_milestones
+
 contacts ──< event_participants >── events ──> event_types
+
+todo_groups ──< todo_items
+todo_items ──< todo_item_contacts >── contacts
+todo_items ──< todo_item_events >── events
 
 daily_summaries ──< attachment_links >── attachments
 events          ──< attachment_links >── attachments
 ```
 
-说明：
-- 当前 `daily_summaries` 不直接挂在 `events` 下
-- 当前联系人详情通过事件聚合拿到部分附件展示，但没有独立联系人附件表
+## 迁移历史
 
-## 运行时模型与数据库差异
+### v1 → v2
 
-### 事件状态差异
-- DB 有 `events.status`
-- Dart `Event` 无 `status`
-- 当前文档与代码都应把它视作兼容字段
+- 引入事件、参与人、旧版事件总结、附件、AI 表
+- 初始化默认事件类型
 
-### 总结模型差异
-- DB 当前主表是 `daily_summaries`
-- 代码主模型是 `DailySummary`
-- `EventSummary` 在代码中只是 `typedef` 到 `DailySummary` 的兼容别名
+### v2 → v3
 
-## 迁移说明
-
-### v1 -> v2
-- 从旧的 `contact_events` 迁移到 `events` 与 `event_participants`
-- 初始化事件类型
-
-### v2 -> v3
 - 创建 `daily_summaries`
-- 将旧 `event_summaries` 归并迁移到 `daily_summaries`
+- 将 `event_summaries` 归并迁移到 `daily_summaries`
 
-## 设计建议
+### v3 → v4
 
-1. 后续若彻底放弃状态语义，应补一次 schema 清理迁移，移除 `events.status`
-2. 后续若恢复事件级总结，应明确区分“事件总结”和“每日总结”，不要复用现有表名与模型名
-3. 若附件未来支持联系人直挂，应扩展 `attachment_links.ownerType`，不需要重建附件表
+- 创建 `contact_milestones`
+
+### v4 → v5
+
+- 扩展 `attachments`，支持 `managed` / `linked` 混合存储元数据
+
+### v5 → v6
+
+- 为 `attachments` 增加预览状态字段：
+  `previewStatus`、`previewUpdatedAt`、`previewError`
+
+### v6 → v7
+
+- 创建 `app_preferences`
+- 将时间节点类别开关持久化到本地数据库
+
+### v7 → v8
+
+- 创建 `todo_groups`
+- 创建 `todo_items`
+- 创建 `todo_item_contacts` 与 `todo_item_events`
+
+## 当前设计建议
+
+1. 后续若彻底放弃事件状态语义，应补 schema 清理迁移，移除 `events.status`
+2. 后续若需要待办排序拖拽与跨组移动，应补充更明确的排序策略和批量更新接口
+3. 后续若时间节点来源继续扩展，应补充外部节点源缓存结构，并评估是否需要从通用偏好表拆出专门配置表

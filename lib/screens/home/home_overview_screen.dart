@@ -1,94 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../config/app_constants.dart';
+import '../../providers/home_provider.dart';
+import '../../services/read/home_read_service.dart';
+import '../../utils/display_formatters.dart';
+import '../../widgets/common/error_state.dart';
+import '../../widgets/common/workbench_page_header.dart';
+import '../../widgets/home/home_overview_content.dart';
+import 'home_overview_actions.dart';
 
 class HomeOverviewScreen extends StatelessWidget {
-  final VoidCallback onOpenContacts;
-  final VoidCallback onOpenEvents;
-  final VoidCallback onOpenTags;
-  final VoidCallback onOpenSettings;
-
-  const HomeOverviewScreen({
-    super.key,
-    required this.onOpenContacts,
-    required this.onOpenEvents,
-    required this.onOpenTags,
-    required this.onOpenSettings,
-  });
+  const HomeOverviewScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('主页')),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          Text(
-            '当前建议优先查看附件闭环、导航入口和搜索状态。',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _ModuleCard(
-            title: '通讯录',
-            description: '查看联系人、分组过滤、详情聚合。',
-            actionLabel: '进入通讯录',
-            onTap: onOpenContacts,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _ModuleCard(
-            title: '事件',
-            description: '查看事件列表、事件详情、总结和附件。',
-            actionLabel: '进入事件',
-            onTap: onOpenEvents,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _ModuleCard(
-            title: '分组',
-            description: '进入分组管理，检查分组和筛选状态。',
-            actionLabel: '进入分组',
-            onTap: onOpenTags,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _ModuleCard(
-            title: '设置',
-            description: '查看当前版本、阶段和后续工作方向。',
-            actionLabel: '进入设置',
-            onTap: onOpenSettings,
-          ),
-        ],
-      ),
+    return ChangeNotifierProvider(
+      create: (context) =>
+          HomeProvider(context.read<HomeReadService>())..load(),
+      child: const _HomeOverviewView(),
     );
   }
 }
 
-class _ModuleCard extends StatelessWidget {
-  final String title;
-  final String description;
-  final String actionLabel;
-  final VoidCallback onTap;
-
-  const _ModuleCard({
-    required this.title,
-    required this.description,
-    required this.actionLabel,
-    required this.onTap,
-  });
+class _HomeOverviewView extends StatelessWidget {
+  const _HomeOverviewView();
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(AppSpacing.md),
           children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.xs),
-            Text(description),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton.tonal(
-              onPressed: onTap,
-              child: Text(actionLabel),
+            WorkbenchPageHeader(
+              eyebrow: 'WORKBENCH · ${formatCompactDateLabel(DateTime.now())}',
+              title: '今日工作台',
+              titleKey: const Key('homePageHeaderTitle'),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Consumer<HomeProvider>(
+              builder: (context, provider, _) {
+                final Widget child;
+
+                if (provider.loading && provider.data == null) {
+                  child = const Padding(
+                    key: ValueKey('home_loading'),
+                    padding: EdgeInsets.only(top: AppSpacing.xl),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                } else if (provider.error != null && provider.data == null) {
+                  child = ErrorState(
+                    key: const ValueKey('home_error'),
+                    message: provider.error?.message ?? '加载失败',
+                    onRetry: provider.load,
+                  );
+                } else if (provider.data == null) {
+                  child = const SizedBox.shrink(key: ValueKey('home_empty'));
+                } else {
+                  final data = provider.data!;
+
+                  child = HomeOverviewContent(
+                    data: data,
+                    onCreateContact: () => createContactFromHome(context),
+                    onCreateEvent: () => createEventFromHome(context),
+                    onCreateTodayEvent: () => createTodayEventFromHome(context),
+                    onOpenEvents: () => openEventsFromHome(context),
+                    onOpenContacts: () => openContactsFromHome(context),
+                    onOpenTodos: () => openTodosFromHome(context),
+                    onOpenEventsByDate: (date) => openEventsFromHome(
+                      context,
+                      initialSelectedDate: date,
+                    ),
+                    onOpenEventDetail: (id) => openEventDetailFromHome(context, id),
+                    onOpenSummaries: () => openSummariesFromHome(context),
+                    onOpenContactDetail: (id) => openContactDetailFromHome(context, id),
+                  );
+                }
+
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: child,
+                );
+              },
             ),
           ],
         ),

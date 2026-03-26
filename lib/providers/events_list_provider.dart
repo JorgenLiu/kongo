@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+
 import 'base_provider.dart';
 import '../models/event_type.dart';
 import '../services/event_service.dart';
@@ -7,6 +11,7 @@ class EventsListProvider extends BaseProvider {
   final EventReadService _eventReadService;
   final EventService _eventService;
   final String? _contactId;
+  final Listenable? _calendarTimeNodeSettingsListenable;
   String _keyword = '';
   String? _selectedEventTypeId;
 
@@ -14,7 +19,11 @@ class EventsListProvider extends BaseProvider {
     this._eventReadService,
     this._eventService, {
     String? contactId,
-  }) : _contactId = contactId;
+    Listenable? calendarTimeNodeSettingsListenable,
+  })  : _contactId = contactId,
+        _calendarTimeNodeSettingsListenable = calendarTimeNodeSettingsListenable {
+    _calendarTimeNodeSettingsListenable?.addListener(_handleCalendarTimeNodeSettingsChanged);
+  }
 
   EventsListReadModel? _data;
   List<EventType> _eventTypes = const [];
@@ -65,5 +74,19 @@ class EventsListProvider extends BaseProvider {
       keyword: _keyword,
       eventTypeId: _selectedEventTypeId,
     );
+  }
+
+  void _handleCalendarTimeNodeSettingsChanged() {
+    if (loading || !initialized) {
+      return;
+    }
+
+    unawaited(refresh());
+  }
+
+  @override
+  void dispose() {
+    _calendarTimeNodeSettingsListenable?.removeListener(_handleCalendarTimeNodeSettingsChanged);
+    super.dispose();
   }
 }

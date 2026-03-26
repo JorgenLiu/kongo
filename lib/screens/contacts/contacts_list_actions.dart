@@ -7,6 +7,7 @@ import '../../models/tag.dart';
 import '../../providers/contact_provider.dart';
 import '../../providers/tag_provider.dart';
 import '../../utils/contact_action_helpers.dart';
+import '../../config/page_transitions.dart';
 import '../../utils/navigation_helpers.dart';
 import '../../widgets/contact/contact_tag_filter_sheet.dart';
 import '../tags/tag_management_screen.dart';
@@ -15,7 +16,7 @@ import 'contact_form_screen.dart';
 
 Future<void> createContactFromList(BuildContext context) async {
   final draft = await Navigator.of(context).push<ContactDraft>(
-    MaterialPageRoute(
+    SlidePageRoute(
       builder: (_) => const ContactFormScreen(),
     ),
   );
@@ -40,7 +41,7 @@ Future<void> createContactFromList(BuildContext context) async {
 
 Future<void> editContactFromList(BuildContext context, Contact contact) async {
   final draft = await Navigator.of(context).push<ContactDraft>(
-    MaterialPageRoute(
+    SlidePageRoute(
       builder: (_) => ContactFormScreen(initialContact: contact),
     ),
   );
@@ -106,7 +107,7 @@ Future<void> deleteContactFromList(BuildContext context, Contact contact) async 
 
 Future<void> openTagManagementFromList(BuildContext context) async {
   await Navigator.of(context).push<void>(
-    MaterialPageRoute(
+    SlidePageRoute(
       builder: (_) => const TagManagementScreen(),
     ),
   );

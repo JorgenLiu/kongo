@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../../config/app_constants.dart';
 
 /// 搜索框
@@ -7,6 +8,7 @@ class SearchBar extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final String hintText;
   final VoidCallback? onClear;
+  final Widget? trailing;
 
   const SearchBar({
     super.key,
@@ -14,12 +16,14 @@ class SearchBar extends StatelessWidget {
     required this.onChanged,
     this.hintText = '搜索联系人...',
     this.onClear,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final shadowOpacity = Theme.of(context).brightness == Brightness.dark ? 0.18 : 0.06;
+    final backgroundColor = colorScheme.surfaceContainerHighest.withValues(alpha: 0.42);
 
     return Padding(
       padding: const EdgeInsets.symmetric(
@@ -35,18 +39,13 @@ class SearchBar extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
             decoration: BoxDecoration(
-              color: colorScheme.surface,
+              color: backgroundColor,
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: hasValue
-                    ? colorScheme.primary.withValues(alpha: 0.55)
-                    : colorScheme.outlineVariant,
-              ),
               boxShadow: [
                 BoxShadow(
                   color: colorScheme.shadow.withValues(alpha: shadowOpacity),
-                  blurRadius: 18,
-                  offset: const Offset(0, 10),
+                  blurRadius: hasValue ? 10 : 6,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
@@ -79,6 +78,7 @@ class SearchBar extends StatelessWidget {
                 ),
                 if (hasValue)
                   IconButton(
+                    tooltip: '清空搜索',
                     icon: const Icon(Icons.clear),
                     color: colorScheme.outline,
                     onPressed: () {
@@ -89,6 +89,7 @@ class SearchBar extends StatelessWidget {
                   )
                 else
                   const SizedBox(width: AppSpacing.sm),
+                if (trailing != null) trailing!,
               ],
             ),
           );

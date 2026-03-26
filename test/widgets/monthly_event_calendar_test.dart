@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kongo/models/event.dart';
 import 'package:kongo/config/app_colors.dart';
+import 'package:kongo/models/calendar_time_node.dart';
 import 'package:kongo/widgets/event/monthly_event_calendar.dart';
 
 void main() {
@@ -108,5 +109,33 @@ void main() {
     expect(find.text('选择年月'), findsOneWidget);
     expect(find.text('2029 年'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Monthly event calendar shows contact milestone node badge', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MonthlyEventCalendar(
+            events: const [],
+            initialMonth: DateTime(2026, 3),
+            calendarTimeNodes: [
+              CalendarTimeNodeReadModel(
+                id: 'milestone-1',
+                kind: CalendarTimeNodeKind.contactMilestone,
+                title: '生日',
+                subtitle: '张三',
+                leadingText: '🎂',
+                anchorDate: DateTime(2020, 3, 8),
+                linkedContactId: 'contact-1',
+                isRecurring: true,
+                isLunar: false,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.byKey(const Key('eventsMonthlyCalendar_nodeBadge_8')), findsOneWidget);
   });
 }

@@ -88,6 +88,7 @@ class _EventFormParticipantsSectionState extends State<EventFormParticipantsSect
                 suffixIcon: _searchController.text.trim().isEmpty
                     ? null
                     : IconButton(
+                        tooltip: '清空搜索',
                         onPressed: () {
                           _searchController.clear();
                           setState(() {});

@@ -9,12 +9,14 @@ class ScheduleTodayTimeline extends StatefulWidget {
   final List<EventListItemReadModel> items;
   final DateTime? referenceDate;
   final ValueChanged<EventListItemReadModel> onItemTap;
+  final VoidCallback? onCreateEvent;
 
   const ScheduleTodayTimeline({
     super.key,
     required this.items,
     this.referenceDate,
     required this.onItemTap,
+    this.onCreateEvent,
   });
 
   @override
@@ -70,6 +72,49 @@ class _ScheduleTodayTimelineState extends State<ScheduleTodayTimeline> {
     }
     final reference = widget.referenceDate ?? DateTime.now();
 
+    if (today.isEmpty) {
+      return ListView(
+        key: const Key('scheduleTodayTimeline'),
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.lg,
+        ),
+        children: [
+          _TimelineHeader(referenceDate: reference, itemCount: 0),
+          const SizedBox(height: AppSpacing.md),
+          EmptyState(
+            icon: Icons.event_busy_outlined,
+            message: '当日暂无日程',
+            asCard: true,
+            actionLabel: widget.onCreateEvent != null ? '新建当日日程' : null,
+            onAction: widget.onCreateEvent,
+          ),
+        ],
+      );
+    }
+
+    // Build entries: merge consecutive empty hours
+    final entries = <_TimelineEntry>[];
+    int hour = 0;
+    while (hour < 24) {
+      final items = itemsByHour[hour];
+      if (items != null && items.isNotEmpty) {
+        entries.add(_TimelineEntry.slot(hour, items));
+        hour++;
+      } else {
+        final rangeStart = hour;
+        while (hour < 24 &&
+            (itemsByHour[hour] == null || itemsByHour[hour]!.isEmpty)) {
+          hour++;
+        }
+        entries.add(_TimelineEntry.collapsed(rangeStart, hour - 1));
+      }
+    }
+
     return ListView.builder(
       key: const Key('scheduleTodayTimeline'),
       controller: _scrollController,
@@ -80,7 +125,7 @@ class _ScheduleTodayTimelineState extends State<ScheduleTodayTimeline> {
         AppSpacing.md,
         AppSpacing.lg,
       ),
-      itemCount: today.isEmpty ? 3 : 26,
+      itemCount: entries.length + 2,
       itemBuilder: (context, index) {
         if (index == 0) {
           return _TimelineHeader(
@@ -93,19 +138,21 @@ class _ScheduleTodayTimelineState extends State<ScheduleTodayTimeline> {
           return const SizedBox(height: AppSpacing.md);
         }
 
-        if (today.isEmpty) {
-          return const EmptyState(
-            icon: Icons.event_busy_outlined,
-            message: '当日暂无日程',
-            asCard: true,
+        final entry = entries[index - 2];
+        if (entry.isCollapsed) {
+          return _CollapsedHourRange(
+            startHour: entry.startHour,
+            endHour: entry.endHour!,
+            containsCurrentHour:
+                reference.hour >= entry.startHour &&
+                reference.hour <= entry.endHour!,
           );
         }
 
-        final hour = index - 2;
         return _TimelineHourSlot(
-          hour: hour,
-          items: itemsByHour[hour] ?? const <EventListItemReadModel>[],
-          highlighted: hour == reference.hour,
+          hour: entry.startHour,
+          items: entry.items!,
+          highlighted: entry.startHour == reference.hour,
           onItemTap: widget.onItemTap,
         );
       },
@@ -165,6 +212,75 @@ class _ScheduleTodayTimelineState extends State<ScheduleTodayTimeline> {
     }
 
     return 0;
+  }
+}
+
+class _TimelineEntry {
+  final int startHour;
+  final int? endHour;
+  final List<EventListItemReadModel>? items;
+
+  const _TimelineEntry.slot(this.startHour, this.items) : endHour = null;
+  const _TimelineEntry.collapsed(this.startHour, this.endHour) : items = null;
+
+  bool get isCollapsed => items == null;
+}
+
+class _CollapsedHourRange extends StatelessWidget {
+  final int startHour;
+  final int endHour;
+  final bool containsCurrentHour;
+
+  const _CollapsedHourRange({
+    required this.startHour,
+    required this.endHour,
+    required this.containsCurrentHour,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final hourCount = endHour - startHour + 1;
+    final label = hourCount == 1
+        ? '${startHour.toString().padLeft(2, '0')}:00 无安排'
+        : '${startHour.toString().padLeft(2, '0')}:00 – ${(endHour + 1).toString().padLeft(2, '0')}:00 无安排（$hourCount 小时）';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 58,
+            child: Text(
+              '⋯',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: colorScheme.outlineVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+          ),
+          SizedBox(
+            width: 28,
+            child: Center(
+              child: CustomPaint(
+                size: const Size(2, 32),
+                painter: _DashedLinePainter(color: colorScheme.outlineVariant),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.outlineVariant,
+                  fontStyle: FontStyle.italic,
+                ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -352,13 +468,15 @@ class _TimelineEventCard extends StatelessWidget {
                       vertical: AppSpacing.xs,
                     ),
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
+                      color: _parseHex(item.eventTypeColor)?.withAlpha(38) ??
+                          colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
                     child: Text(
                       startAt == null ? '待定' : formatDateTimeLabel(startAt).split(' ').last,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: colorScheme.primary,
+                            color: _parseHex(item.eventTypeColor) ??
+                                colorScheme.primary,
                             fontWeight: FontWeight.w700,
                           ),
                     ),
@@ -391,4 +509,39 @@ class _TimelineEventCard extends StatelessWidget {
       ),
     );
   }
+
+  static Color? _parseHex(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    final raw = hex.replaceFirst('#', '');
+    final value = int.tryParse(raw, radix: 16);
+    if (value == null) return null;
+    return raw.length == 6 ? Color(0xFF000000 | value) : Color(value);
+  }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+
+  _DashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = size.width;
+    const dashHeight = 4.0;
+    const gapHeight = 3.0;
+    var y = 0.0;
+    while (y < size.height) {
+      canvas.drawLine(
+        Offset(size.width / 2, y),
+        Offset(size.width / 2, (y + dashHeight).clamp(0, size.height)),
+        paint,
+      );
+      y += dashHeight + gapHeight;
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedLinePainter oldDelegate) => color != oldDelegate.color;
 }

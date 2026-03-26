@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:kongo/models/contact_draft.dart';
+import 'package:kongo/models/contact_milestone.dart';
+import 'package:kongo/models/contact_milestone_draft.dart';
 import 'package:kongo/widgets/contact/contact_card.dart';
 import 'package:kongo/widgets/contact/contact_alphabet_index_bar.dart';
 import 'package:kongo/screens/contacts/contacts_list_screen.dart';
 import 'package:kongo/services/read/contact_read_service.dart';
+import 'package:kongo/services/read/todo_read_service.dart';
 
 import '../test_helpers/test_app_harness.dart';
 
@@ -24,12 +27,32 @@ Future<void> pumpUntilFound(
   fail('Timed out waiting for expected widget');
 }
 
+Future<void> pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  int maxAttempts = 100,
+}) async {
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    if (finder.evaluate().isEmpty) {
+      return;
+    }
+  }
+
+  fail('Timed out waiting for widget to disappear');
+}
+
+Future<void> drainPendingDatabaseTimers(WidgetTester tester) async {
+  await tester.pump(const Duration(seconds: 11));
+}
+
 Widget buildContactsScreen(TestAppHarness harness) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: harness.dependencies.contactProvider),
       ChangeNotifierProvider.value(value: harness.dependencies.tagProvider),
       Provider<ContactReadService>.value(value: harness.dependencies.contactReadService),
+      Provider<TodoReadService>.value(value: harness.dependencies.todoReadService),
     ],
     child: const MaterialApp(
       home: ContactsListScreen(),
@@ -43,6 +66,7 @@ void main() {
 
   setUp(() async {
     harness = await createTestAppHarness();
+    await harness.dependencies.contactProvider.loadContacts();
     await harness.dependencies.tagProvider.loadTags();
   });
 
@@ -63,6 +87,8 @@ void main() {
     expect(find.byKey(const Key('contactsBodyCountLabel')), findsOneWidget);
     expect(find.text('搜索联系人...'), findsOneWidget);
     expect(find.byType(ContactCard), findsWidgets);
+    expect(find.byIcon(Icons.filter_list_outlined), findsNothing);
+    expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
   });
 
   testWidgets('Contacts screen searches through provider data', (WidgetTester tester) async {
@@ -73,7 +99,7 @@ void main() {
     await tester.runAsync(() async {
       await harness.dependencies.contactProvider.searchByKeyword('138 0000 0001');
     });
-    await pumpUntilFound(tester, find.text('1 个联系人').last);
+    await pumpUntilFound(tester, find.text('1 人').last);
 
     expect(find.byType(ContactCard), findsOneWidget);
     expect(find.byKey(const Key('contactsBodyCountLabel')), findsOneWidget);
@@ -82,41 +108,45 @@ void main() {
   testWidgets('Contact detail screen opens from the contacts list', (
     WidgetTester tester,
   ) async {
-    var targetPhone = '';
+    var targetName = '';
 
     await tester.runAsync(() async {
       final contacts = await harness.dependencies.contactService.getContacts();
       for (final contact in contacts) {
-        if (contact.phone == null) {
-          continue;
-        }
-
         final events = await harness.dependencies.contactService.getContactEvents(contact.id);
         if (events.isEmpty) {
           continue;
         }
 
-        targetPhone = contact.phone!;
+        targetName = contact.name;
         break;
       }
     });
 
-    expect(targetPhone, isNotEmpty);
+    expect(targetName, isNotEmpty);
 
     await tester.pumpWidget(buildContactsScreen(harness));
     await openContactsTab(tester);
 
-    await tester.enterText(find.byType(TextField), targetPhone);
-    await tester.runAsync(() async {
-      await harness.dependencies.contactProvider.searchByKeyword(targetPhone);
-    });
-    await pumpUntilFound(tester, find.text('1 个联系人').last);
+    final targetCard = find.ancestor(
+      of: find.text(targetName).first,
+      matching: find.byType(ContactCard),
+    );
+    await tester.scrollUntilVisible(
+      targetCard.first,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
 
-    await tester.tap(find.byType(ContactCard));
-    await tester.pump();
+    await tester.tap(targetCard.first);
+    await tester.pump(const Duration(milliseconds: 300));
     await pumpUntilFound(tester, find.text('联系人详情'));
 
     expect(find.text('联系人详情'), findsOneWidget);
+    expect(find.text(targetName), findsWidgets);
+
+    await drainPendingDatabaseTimers(tester);
+
   });
 
   testWidgets('Alphabet index bar adapts to constrained height without overflow', (
@@ -207,5 +237,32 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.getTopLeft(targetGroup).dy, lessThan(520));
+  });
+
+  testWidgets('Contacts screen shows upcoming important dates in overview mode', (
+    WidgetTester tester,
+  ) async {
+    final firstContact = harness.dependencies.contactProvider.contacts.first;
+    final today = DateTime.now();
+
+    await tester.runAsync(() async {
+      await harness.dependencies.contactMilestoneService.createMilestone(
+        firstContact.id,
+        ContactMilestoneDraft(
+          type: ContactMilestoneType.birthday,
+          milestoneDate: DateTime(today.year - 20, today.month, today.day + 2),
+          isRecurring: true,
+        ),
+      );
+      await harness.dependencies.contactProvider.loadContacts();
+    });
+
+    await tester.pumpWidget(buildContactsScreen(harness));
+    await openContactsTab(tester);
+    await pumpUntilFound(tester, find.text('即将到来的重要日期'));
+
+    expect(find.text('即将到来的重要日期'), findsOneWidget);
+    expect(find.text(firstContact.name), findsWidgets);
+    expect(find.textContaining('生日'), findsWidgets);
   });
 }

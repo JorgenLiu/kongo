@@ -26,6 +26,7 @@ class EventSearchResultsList extends StatelessWidget {
               child: EventListItemCard(
                 event: item.event,
                 eventTypeName: item.eventTypeName,
+                eventTypeColor: item.eventTypeColor,
                 participantNames: item.participantNames,
                 highlightQuery: highlightQuery,
                 onTap: () => onItemTap(item),

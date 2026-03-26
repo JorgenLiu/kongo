@@ -20,8 +20,16 @@ class TagListTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final hasContextMenuActions = onEdit != null || onDelete != null;
 
-    return Card(
+    return Semantics(
+      label: '标签 ${tag.name}',
+      button: true,
+      child: GestureDetector(
+      onSecondaryTapDown: hasContextMenuActions
+          ? (details) => _showContextMenu(context, details.globalPosition)
+          : null,
+      child: Card(
       child: ListTile(
         onTap: onTap,
         leading: CircleAvatar(
@@ -68,7 +76,44 @@ class TagListTile extends StatelessWidget {
           ],
         ),
       ),
+    ),
+    ),
     );
+  }
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
+      items: [
+        if (onEdit != null)
+          PopupMenuItem(
+            value: 'edit',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 18, color: colorScheme.onSurface),
+                const SizedBox(width: AppSpacing.sm),
+                const Text('编辑'),
+              ],
+            ),
+          ),
+        if (onDelete != null)
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, size: 18, color: colorScheme.error),
+                const SizedBox(width: AppSpacing.sm),
+                Text('删除', style: TextStyle(color: colorScheme.error)),
+              ],
+            ),
+          ),
+      ],
+    ).then((value) {
+      if (value == 'edit') onEdit?.call();
+      if (value == 'delete') onDelete?.call();
+    });
   }
 }
 

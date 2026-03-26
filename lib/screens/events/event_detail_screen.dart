@@ -5,13 +5,16 @@ import '../../config/app_constants.dart';
 import '../../models/event.dart';
 import '../../providers/event_detail_provider.dart';
 import '../../services/read/event_read_service.dart';
+import '../../services/read/todo_read_service.dart';
 import '../../widgets/common/detail_skeleton.dart';
 import '../../widgets/common/error_state.dart';
 import '../../widgets/event/event_detail_attachments_section.dart';
 import '../../widgets/event/event_detail_header.dart';
 import '../../widgets/event/event_detail_info_section.dart';
 import '../../widgets/event/event_detail_participants_section.dart';
+import '../../widgets/todo/related_todo_section.dart';
 import 'event_detail_actions.dart';
+import '../todos/todo_link_actions.dart';
 
 class EventDetailScreen extends StatelessWidget {
   final String eventId;
@@ -26,6 +29,7 @@ class EventDetailScreen extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (context) => EventDetailProvider(
         context.read<EventReadService>(),
+        context.read<TodoReadService>(),
         eventId,
       )..load(),
       child: const _EventDetailView(),
@@ -67,7 +71,10 @@ class _EventDetailView extends StatelessWidget {
                     ),
                   ],
           ),
-          body: _buildBody(context, provider),
+          body: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 300),
+            child: _buildBody(context, provider),
+          ),
         );
       },
     );
@@ -75,60 +82,137 @@ class _EventDetailView extends StatelessWidget {
 
   Widget _buildBody(BuildContext context, EventDetailProvider provider) {
     if (provider.loading && provider.data == null) {
-      return const DetailSkeleton();
+      return const DetailSkeleton(key: ValueKey('event_detail_skeleton'));
     }
 
     if (provider.error != null && provider.data == null) {
-      return _buildErrorState(provider);
+      return KeyedSubtree(
+        key: const ValueKey('event_detail_error'),
+        child: _buildErrorState(provider),
+      );
     }
 
     final data = provider.data;
     if (data == null) {
-      return const SizedBox.shrink();
+      return const SizedBox.shrink(key: ValueKey('event_detail_empty'));
     }
 
     return RefreshIndicator(
       onRefresh: provider.refresh,
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          EventDetailHeader(
-            event: data.event,
-            eventTypeName: data.eventTypeName,
-            participantCount: data.participants.length,
-            attachmentCount: data.attachments.length,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          EventDetailInfoSection(
-            event: data.event,
-            createdByContact: data.createdByContact,
-          ),
-          const SizedBox(height: AppSpacing.md),
-          EventDetailParticipantsSection(
-            participants: data.participantEntries,
-            onOpenContact: (participant) =>
-                openEventParticipantContactDetail(context, participant.contact.id),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          EventDetailAttachmentsSection(
-            attachments: data.attachments,
-            onAddAttachment: () => addEventAttachment(context, event: data.event),
-            onOpenAttachment: (attachment) => openEventAttachment(
-              context,
-              attachment: attachment,
-            ),
-            onUnlinkAttachment: (attachment) => unlinkEventAttachment(
-              context,
-              event: data.event,
-              attachment: attachment,
-            ),
-            onDeleteAttachment: (attachment) => deleteEventAttachment(
-              context,
-              event: data.event,
-              attachment: attachment,
-            ),
-          ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= AppBreakpoints.wide;
+          return ListView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            children: [
+              EventDetailHeader(
+                event: data.event,
+                eventTypeName: data.eventTypeName,
+                participantCount: data.participants.length,
+                attachmentCount: data.attachments.length,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              if (wide)
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 3,
+                        child: EventDetailInfoSection(
+                          event: data.event,
+                          createdByContact: data.createdByContact,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        flex: 2,
+                        child: Column(
+                          children: [
+                            EventDetailParticipantsSection(
+                              participants: data.participantEntries,
+                              onOpenContact: (participant) =>
+                                  openEventParticipantContactDetail(
+                                      context, participant.contact.id),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            EventDetailAttachmentsSection(
+                              attachments: data.attachments,
+                              onAddAttachment: () =>
+                                  addEventAttachment(context, event: data.event),
+                              onOpenAttachment: (attachment) => openEventAttachment(
+                                context,
+                                attachment: attachment,
+                              ),
+                              onUnlinkAttachment: (attachment) =>
+                                  unlinkEventAttachment(
+                                context,
+                                event: data.event,
+                                attachment: attachment,
+                              ),
+                              onDeleteAttachment: (attachment) =>
+                                  deleteEventAttachment(
+                                context,
+                                event: data.event,
+                                attachment: attachment,
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.lg),
+                            RelatedTodoSection(
+                              title: '相关待办',
+                              emptyMessage: '当前还没有关联到这个事件的待办项。',
+                              items: provider.linkedTodoItems,
+                              onCreate: () => createTodoFromEventDetailAction(context, data.event),
+                              onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else ...[
+                EventDetailInfoSection(
+                  event: data.event,
+                  createdByContact: data.createdByContact,
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                EventDetailParticipantsSection(
+                  participants: data.participantEntries,
+                  onOpenContact: (participant) =>
+                      openEventParticipantContactDetail(context, participant.contact.id),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                EventDetailAttachmentsSection(
+                  attachments: data.attachments,
+                  onAddAttachment: () => addEventAttachment(context, event: data.event),
+                  onOpenAttachment: (attachment) => openEventAttachment(
+                    context,
+                    attachment: attachment,
+                  ),
+                  onUnlinkAttachment: (attachment) => unlinkEventAttachment(
+                    context,
+                    event: data.event,
+                    attachment: attachment,
+                  ),
+                  onDeleteAttachment: (attachment) => deleteEventAttachment(
+                    context,
+                    event: data.event,
+                    attachment: attachment,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                RelatedTodoSection(
+                  title: '相关待办',
+                  emptyMessage: '当前还没有关联到这个事件的待办项。',
+                  items: provider.linkedTodoItems,
+                  onCreate: () => createTodoFromEventDetailAction(context, data.event),
+                  onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }

@@ -6,13 +6,16 @@ import '../../models/tag.dart';
 import '../../providers/contact_provider.dart';
 import '../../providers/tag_provider.dart';
 import '../../utils/contact_indexing.dart';
+import '../../utils/input_debouncer.dart';
 import '../../widgets/common/workbench_page_header.dart';
 import '../../widgets/contact/contact_alphabet_index_bar.dart';
 import '../../widgets/contact/contact_active_tag_filters.dart';
 import '../../widgets/contact/contact_group_section.dart';
 import '../../widgets/contact/contact_header_tags_bar.dart';
+import '../../widgets/contact/contact_upcoming_milestones_card.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/error_state.dart';
+import '../../widgets/common/skeleton_list.dart';
 import '../../widgets/common/search_bar.dart' as custom_search;
 import 'contacts_list_actions.dart';
 
@@ -27,6 +30,7 @@ class ContactsListScreen extends StatefulWidget {
 class _ContactsListScreenState extends State<ContactsListScreen> {
   late TextEditingController _searchController;
   late ScrollController _listScrollController;
+  late final InputDebouncer _searchDebouncer;
   bool _headerTagsExpanded = false;
   String? _selectedQuickIndex;
   final Map<String, GlobalKey> _groupHeaderKeys = <String, GlobalKey>{};
@@ -37,6 +41,7 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     super.initState();
     _searchController = TextEditingController();
     _listScrollController = ScrollController();
+    _searchDebouncer = InputDebouncer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final contactProvider = context.read<ContactProvider>();
       final tagProvider = context.read<TagProvider>();
@@ -51,6 +56,7 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
 
   @override
   void dispose() {
+    _searchDebouncer.dispose();
     _searchController.dispose();
     _listScrollController.dispose();
     super.dispose();
@@ -61,7 +67,21 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     setState(() {
       _selectedQuickIndex = null;
     });
-    context.read<ContactProvider>().searchByKeyword(query);
+    _searchDebouncer.run(() {
+      if (!mounted) {
+        return;
+      }
+
+      context.read<ContactProvider>().searchByKeyword(query);
+    });
+  }
+
+  void _clearSearchAndFilters() {
+    _searchDebouncer.cancel();
+    setState(() {
+      _selectedQuickIndex = null;
+    });
+    context.read<ContactProvider>().clearFilters();
   }
 
   Future<void> _applyHeaderTag(Tag tag, ContactProvider contactProvider) async {
@@ -69,12 +89,20 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
       _selectedQuickIndex = null;
     });
     _searchController.clear();
-    if (contactProvider.selectedTagIds.length == 1 && contactProvider.selectedTagIds.first == tag.id) {
+
+    final nextTagIds = contactProvider.selectedTagIds.toSet();
+    if (nextTagIds.contains(tag.id)) {
+      nextTagIds.remove(tag.id);
+    } else {
+      nextTagIds.add(tag.id);
+    }
+
+    if (nextTagIds.isEmpty) {
       await contactProvider.clearFilters();
       return;
     }
 
-    await contactProvider.searchByTags([tag.id]);
+    await contactProvider.searchByTags(nextTagIds.toList());
   }
 
   Future<void> _openContactDetail(dynamic contact) async {
@@ -128,36 +156,41 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<ContactProvider, TagProvider>(
-      builder: (context, contactProvider, tagProvider, child) {
-        final contactGroups = buildContactGroups(contactProvider.contacts);
-        final quickIndices = buildContactIndices(contactProvider.contacts);
-        final effectiveQuickIndex = quickIndices.contains(_selectedQuickIndex) ? _selectedQuickIndex : null;
-        final selectedTags = resolveSelectedTags(
-          tagProvider.tags,
-          contactProvider.selectedTagIds,
-        );
+    return Scaffold(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Consumer2<ContactProvider, TagProvider>(
+              builder: (context, contactProvider, tagProvider, _) {
+                return _buildTopHeader(contactProvider, tagProvider);
+              },
+            ),
+            Expanded(
+              child: Consumer2<ContactProvider, TagProvider>(
+                builder: (context, contactProvider, tagProvider, _) {
+                  final contactGroups = buildContactGroups(contactProvider.contacts);
+                  final quickIndices = buildContactIndices(contactProvider.contacts);
+                  final effectiveQuickIndex =
+                      quickIndices.contains(_selectedQuickIndex) ? _selectedQuickIndex : null;
+                  final selectedTags = resolveSelectedTags(
+                    tagProvider.tags,
+                    contactProvider.selectedTagIds,
+                  );
 
-        return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                _buildTopHeader(contactProvider, tagProvider),
-                Expanded(
-                  child: _buildListPane(
+                  return _buildListPane(
                     context,
                     contactProvider: contactProvider,
                     selectedTags: selectedTags,
                     contactGroups: contactGroups,
                     quickIndices: quickIndices,
                     selectedQuickIndex: effectiveQuickIndex,
-                  ),
-                ),
-              ],
+                  );
+                },
+              ),
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 
@@ -176,27 +209,12 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
         custom_search.SearchBar(
           controller: _searchController,
           onChanged: _searchContacts,
-        ),
-        ContactActiveTagFilters(
-          selectedTags: selectedTags,
-          onOpenFilter: () => openTagFilterFromList(context),
-          onClear: () async {
-            setState(() {
-              _selectedQuickIndex = null;
-            });
-            await contactProvider.clearFilters();
-          },
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.xs,
-          ),
-          child: Align(
-            alignment: Alignment.centerLeft,
+          onClear: _clearSearchAndFilters,
+          trailing: Padding(
+            padding: const EdgeInsets.only(right: AppSpacing.md),
             child: Text(
               key: const Key('contactsBodyCountLabel'),
-              '$contactCount 个联系人',
+              '$contactCount 人',
               style: TextStyle(
                 fontSize: AppFontSize.bodySmall,
                 color: Theme.of(context).colorScheme.outline,
@@ -204,6 +222,28 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
             ),
           ),
         ),
+        if (selectedTags.isNotEmpty)
+          ContactActiveTagFilters(
+            selectedTags: selectedTags,
+            onOpenFilter: () => openTagFilterFromList(context),
+            onClear: _clearSearchAndFilters,
+          ),
+        if (contactProvider.keyword.trim().isEmpty && selectedTags.isEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: ContactUpcomingMilestonesCard(
+              items: contactProvider.upcomingMilestones,
+              onContactTap: _openContactDetail,
+            ),
+          ),
+          const Divider(height: 1, indent: AppSpacing.md, endIndent: AppSpacing.md),
+          const SizedBox(height: AppSpacing.sm),
+        ],
         Expanded(
           child: _buildBody(
             context,
@@ -224,22 +264,21 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     List<String> quickIndices,
     String? selectedQuickIndex,
   ) {
-    if (contactProvider.loading && !contactProvider.initialized) {
-      return const Center(child: CircularProgressIndicator());
-    }
+    final Widget child;
 
-    if (contactProvider.error != null && contactProvider.contacts.isEmpty) {
-      return ErrorState(
+    if (contactProvider.loading && !contactProvider.initialized) {
+      child = const SkeletonList(key: ValueKey('contacts_skeleton'));
+    } else if (contactProvider.error != null && contactProvider.contacts.isEmpty) {
+      child = ErrorState(
+        key: const ValueKey('contacts_error'),
         message: contactProvider.error!.message,
         onRetry: contactProvider.loadContacts,
       );
-    }
-
-    if (contactGroups.isEmpty) {
-      return _buildEmptyState();
-    }
-
-    return Row(
+    } else if (contactGroups.isEmpty) {
+      child = _buildEmptyState();
+    } else {
+      child = Row(
+        key: const ValueKey('contacts_content'),
       children: [
         Expanded(
           child: SingleChildScrollView(
@@ -285,6 +324,12 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
           ),
         ],
       ],
+    );
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: child,
     );
   }
 

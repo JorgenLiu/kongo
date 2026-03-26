@@ -21,7 +21,7 @@ void main() {
 
     await provider.createSummary(
       DailySummaryDraft(
-        summaryDate: DateTime(2026, 3, 22),
+        summaryDate: DateTime(2025, 1, 15),
         todaySummary: '完成回访纪要整理。',
         tomorrowPlan: 'TODO: 整理后续报价\n- [x] 已同步关键结论',
       ),
@@ -54,7 +54,7 @@ void main() {
 
     await provider.createSummary(
       DailySummaryDraft(
-        summaryDate: DateTime(2026, 3, 23),
+        summaryDate: DateTime(2030, 1, 2),
         todaySummary: '待删除总结',
         tomorrowPlan: 'TODO: 删除我',
       ),
@@ -89,7 +89,7 @@ void main() {
 
     final secondSummary = await harness.dependencies.summaryService.createSummary(
       DailySummaryDraft(
-        summaryDate: DateTime(2026, 3, 24),
+        summaryDate: DateTime(2030, 1, 3),
         todaySummary: '本次合作方向已经确认，等待下轮推进。',
         tomorrowPlan: '',
       ),

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
 import '../../widgets/common/workbench_page_header.dart';
+import '../../widgets/settings/about_section.dart';
+import '../../widgets/settings/appearance_section.dart';
+import '../../widgets/settings/calendar_time_node_section.dart';
+import '../../widgets/settings/data_section.dart';
 import 'settings_overview_actions.dart';
 
 class SettingsOverviewScreen extends StatelessWidget {
@@ -19,27 +23,25 @@ class SettingsOverviewScreen extends StatelessWidget {
               title: '设置',
               titleKey: Key('settingsPageHeaderTitle'),
             ),
+            const SizedBox(height: AppSpacing.lg),
+            // ── 偏好设置 ──
+            _SectionHeader(icon: Icons.tune_outlined, label: '偏好设置'),
+            const SizedBox(height: AppSpacing.sm),
+            const AppearanceSection(),
             const SizedBox(height: AppSpacing.md),
-            const _SettingsInfoCard(
-              title: '当前阶段',
-              body: '当前产品结构已经调整为事件主驱动，通讯录与文件作为辅助入口，分组管理收纳为次级工具。',
+            const CalendarTimeNodeSection(),
+            const SizedBox(height: AppSpacing.xl),
+            // ── 数据管理 ──
+            _SectionHeader(icon: Icons.folder_outlined, label: '数据管理'),
+            const SizedBox(height: AppSpacing.sm),
+            DataSection(
+              onOpenTagManagement: () => openTagManagementFromSettings(context),
             ),
-            const SizedBox(height: AppSpacing.md),
-            _SettingsActionCard(
-              title: '分组管理',
-              body: '集中维护分组命名和筛选维度，不再单独占用底部导航。',
-              actionLabel: '打开分组管理',
-              onPressed: () => openTagManagementFromSettings(context),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            const _SettingsInfoCard(
-              title: '当前验证平台',
-              body: 'macOS 作为当前主要验证平台，便于你直接检查桌面 UI 和文件附件体验。',
-            ),
-            const SizedBox(height: AppSpacing.md),
-            const _SettingsInfoCard(
-              title: '下一步重点',
-              body: '下一轮重点会落在更完整搜索、联系人详情模块深化，以及文件体验继续细化。',
+            const SizedBox(height: AppSpacing.xl),
+            // ── 关于 ──
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
+              child: const AboutSection(),
             ),
           ],
         ),
@@ -48,64 +50,29 @@ class SettingsOverviewScreen extends StatelessWidget {
   }
 }
 
-class _SettingsInfoCard extends StatelessWidget {
-  final String title;
-  final String body;
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-  const _SettingsInfoCard({
-    required this.title,
-    required this.body,
-  });
+  const _SectionHeader({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.xs),
-            Text(body),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsActionCard extends StatelessWidget {
-  final String title;
-  final String body;
-  final String actionLabel;
-  final VoidCallback onPressed;
-
-  const _SettingsActionCard({
-    required this.title,
-    required this.body,
-    required this.actionLabel,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: AppSpacing.xs),
-            Text(body),
-            const SizedBox(height: AppSpacing.md),
-            FilledButton(
-              onPressed: onPressed,
-              child: Text(actionLabel),
-            ),
-          ],
-        ),
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: colorScheme.outline),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: colorScheme.outline,
+                  letterSpacing: 0.8,
+                ),
+          ),
+        ],
       ),
     );
   }

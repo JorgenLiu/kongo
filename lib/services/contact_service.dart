@@ -6,6 +6,7 @@ import '../models/contact_draft.dart';
 import '../models/event.dart';
 import '../models/tag.dart';
 import '../repositories/contact_repository.dart';
+import '../utils/text_normalize.dart';
 import '../repositories/event_repository.dart';
 import '../repositories/tag_repository.dart';
 
@@ -60,11 +61,11 @@ class DefaultContactService implements ContactService {
     final contact = Contact(
       id: _uuid.v4(),
       name: normalizedName,
-      phone: _normalizeOptionalText(draft.phone),
-      email: _normalizeOptionalText(draft.email),
-      address: _normalizeOptionalText(draft.address),
-      avatar: _normalizeOptionalText(draft.avatar),
-      notes: _normalizeOptionalText(draft.notes),
+      phone: normalizeOptionalText(draft.phone),
+      email: normalizeOptionalText(draft.email),
+      address: normalizeOptionalText(draft.address),
+      avatar: normalizeOptionalText(draft.avatar),
+      notes: normalizeOptionalText(draft.notes),
       createdAt: now,
       updatedAt: now,
     );
@@ -95,11 +96,11 @@ class DefaultContactService implements ContactService {
 
     final updated = contact.copyWith(
       name: normalizedName,
-      phone: _normalizeOptionalText(contact.phone),
-      email: _normalizeOptionalText(contact.email),
-      address: _normalizeOptionalText(contact.address),
-      avatar: _normalizeOptionalText(contact.avatar),
-      notes: _normalizeOptionalText(contact.notes),
+      phone: normalizeOptionalText(contact.phone),
+      email: normalizeOptionalText(contact.email),
+      address: normalizeOptionalText(contact.address),
+      avatar: normalizeOptionalText(contact.avatar),
+      notes: normalizeOptionalText(contact.notes),
       updatedAt: DateTime.now(),
     );
 
@@ -148,14 +149,6 @@ class DefaultContactService implements ContactService {
   Future<List<Tag>> getContactTags(String contactId) async {
     await _contactRepository.getById(contactId);
     return _tagRepository.getTagsForContact(contactId);
-  }
-
-  String? _normalizeOptionalText(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-    return normalized;
   }
 
   Future<void> _syncContactTags(String contactId, List<String> targetTagIds) async {

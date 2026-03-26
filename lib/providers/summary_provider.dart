@@ -85,27 +85,28 @@ class SummaryProvider extends BaseProvider {
   }
 
   Future<void> loadSummaryDetail(String summaryId) async {
-    _currentSummary = null;
-    _actionItems = const [];
-    markInitialized(false);
-
-    await execute(() async {
+    await _resetAndLoadDetail(() async {
       _currentSummary = await _summaryService.getSummary(summaryId);
       _actionItems = await _summaryService.extractActionItemsFromSummary(summaryId);
-      markInitialized(true);
     });
   }
 
   Future<void> loadSummaryByDate(DateTime summaryDate) async {
+    await _resetAndLoadDetail(() async {
+      _currentSummary = await _summaryService.getSummaryByDate(summaryDate);
+      if (_currentSummary != null) {
+        _actionItems = await _summaryService.extractActionItemsFromSummary(_currentSummary!.id);
+      }
+    });
+  }
+
+  Future<void> _resetAndLoadDetail(Future<void> Function() loader) async {
     _currentSummary = null;
     _actionItems = const [];
     markInitialized(false);
 
     await execute(() async {
-      _currentSummary = await _summaryService.getSummaryByDate(summaryDate);
-      if (_currentSummary != null) {
-        _actionItems = await _summaryService.extractActionItemsFromSummary(_currentSummary!.id);
-      }
+      await loader();
       markInitialized(true);
     });
   }

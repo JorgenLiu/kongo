@@ -7,6 +7,8 @@ import '../models/event_summary.dart';
 import '../models/event_summary_draft.dart';
 import '../repositories/attachment_repository.dart';
 import '../repositories/summary_repository.dart';
+import '../utils/action_item_parser.dart';
+import '../utils/text_normalize.dart';
 
 abstract class SummaryService {
   Future<List<DailySummary>> getSummaries();
@@ -71,8 +73,8 @@ class DefaultSummaryService implements SummaryService {
       todaySummary: normalizedTodaySummary,
       tomorrowPlan: normalizedTomorrowPlan,
       source: draft.source,
-      createdByContactId: _normalizeOptionalText(draft.createdByContactId),
-      aiJobId: _normalizeOptionalText(draft.aiJobId),
+      createdByContactId: normalizeOptionalText(draft.createdByContactId),
+      aiJobId: normalizeOptionalText(draft.aiJobId),
       createdAt: now,
       updatedAt: now,
     );
@@ -98,8 +100,8 @@ class DefaultSummaryService implements SummaryService {
         todaySummary: summary.todaySummary.trim(),
         tomorrowPlan: summary.tomorrowPlan.trim(),
         source: summary.source,
-        createdByContactId: _normalizeOptionalText(summary.createdByContactId),
-        aiJobId: _normalizeOptionalText(summary.aiJobId),
+        createdByContactId: normalizeOptionalText(summary.createdByContactId),
+        aiJobId: normalizeOptionalText(summary.aiJobId),
         createdAt: existing.createdAt,
         updatedAt: DateTime.now(),
       ),
@@ -116,62 +118,11 @@ class DefaultSummaryService implements SummaryService {
   @override
   Future<List<ActionItem>> extractActionItemsFromSummary(String summaryId) async {
     final summary = await _summaryRepository.getById(summaryId);
-    final checkboxPattern = RegExp(r'^\s*(?:-|\*)\s*\[( |x|X)\]\s+(.+)$');
-    final todoPattern = RegExp(r'^\s*(?:TODO|待办)[:：]\s*(.+)$', caseSensitive: false);
-    final numberedPattern = RegExp(r'^\s*\d+\.\s+(.+)$');
-
-    final items = <ActionItem>[];
     final combinedContent = [summary.tomorrowPlan, summary.todaySummary]
         .where((section) => section.trim().isNotEmpty)
         .join('\n');
 
-    for (final rawLine in combinedContent.split('\n')) {
-      final line = rawLine.trim();
-      if (line.isEmpty) {
-        continue;
-      }
-
-      final checkboxMatch = checkboxPattern.firstMatch(line);
-      if (checkboxMatch != null) {
-        items.add(
-          ActionItem(
-            title: checkboxMatch.group(2)!.trim(),
-            completed: checkboxMatch.group(1)!.toLowerCase() == 'x',
-          ),
-        );
-        continue;
-      }
-
-      final todoMatch = todoPattern.firstMatch(line);
-      if (todoMatch != null) {
-        items.add(ActionItem(title: todoMatch.group(1)!.trim()));
-        continue;
-      }
-
-      final numberedMatch = numberedPattern.firstMatch(line);
-      if (numberedMatch != null) {
-        items.add(ActionItem(title: _normalizeActionItemTitle(numberedMatch.group(1)!.trim(), todoPattern)));
-      }
-    }
-
-    return items;
-  }
-
-  String _normalizeActionItemTitle(String value, RegExp todoPattern) {
-    final todoMatch = todoPattern.firstMatch(value);
-    if (todoMatch != null) {
-      return todoMatch.group(1)!.trim();
-    }
-
-    return value.trim();
-  }
-
-  String? _normalizeOptionalText(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-    return normalized;
+    return parseActionItems(combinedContent);
   }
 
   DateTime _normalizeDate(DateTime value) {

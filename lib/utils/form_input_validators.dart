@@ -9,6 +9,8 @@ class FormFieldLimits {
   static const int eventDescription = 1000;
   static const int summaryBody = 4000;
   static const int tagName = 32;
+  static const int todoGroupTitle = 48;
+  static const int todoItemTitle = 120;
 }
 
 class FormInputValidators {

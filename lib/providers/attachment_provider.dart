@@ -44,11 +44,17 @@ class AttachmentProvider extends BaseProvider {
     required AttachmentOwnerType ownerType,
     required String ownerId,
     String? label,
+    AttachmentStorageMode? preferredStorageMode,
+    AttachmentImportPolicy? importPolicy,
+    bool allowLargeFile = false,
   }) async {
     await execute(() async {
       await _attachmentService.saveAttachment(
         AttachmentDraft(
           sourcePath: sourcePath,
+          preferredStorageMode: preferredStorageMode,
+          importPolicy: importPolicy,
+          allowLargeFile: allowLargeFile,
           ownerType: ownerType,
           ownerId: ownerId,
           label: label,

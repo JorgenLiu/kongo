@@ -37,7 +37,7 @@ class ContactGroupSection extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: colorScheme.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.sm),
           ),
           child: Row(
             children: [
@@ -58,10 +58,10 @@ class ContactGroupSection extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpacing.xs),
         ...contacts.map(
           (contact) => Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
             child: ContactCard(
               contact: contact,
               onTap: () => onTap(contact),

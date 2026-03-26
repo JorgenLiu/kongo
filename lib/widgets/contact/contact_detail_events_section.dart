@@ -11,6 +11,7 @@ class ContactDetailEventsSection extends StatelessWidget {
   final Contact contact;
   final List<Event> events;
   final Map<String, String> eventTypeNames;
+  final Map<String, String> eventTypeColors;
   final VoidCallback onOpenModule;
   final ValueChanged<String> onOpenEvent;
 
@@ -19,6 +20,7 @@ class ContactDetailEventsSection extends StatelessWidget {
     required this.contact,
     required this.events,
     required this.eventTypeNames,
+    this.eventTypeColors = const {},
     required this.onOpenModule,
     required this.onOpenEvent,
   });
@@ -26,6 +28,7 @@ class ContactDetailEventsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
+      icon: Icons.event_note_outlined,
       title: '相关事件',
       trailing: TextButton(
         onPressed: onOpenModule,
@@ -44,6 +47,7 @@ class ContactDetailEventsSection extends StatelessWidget {
                       child: EventListItemCard(
                         event: event,
                         eventTypeName: eventTypeNames[event.eventTypeId],
+                        eventTypeColor: eventTypeColors[event.eventTypeId],
                         onTap: () => onOpenEvent(event.id),
                       ),
                     ),

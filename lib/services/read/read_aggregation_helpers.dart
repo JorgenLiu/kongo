@@ -8,6 +8,13 @@ Map<String, String> buildEventTypeNames(List<EventType> eventTypes) {
   };
 }
 
+Map<String, String> buildEventTypeColors(List<EventType> eventTypes) {
+  return {
+    for (final eventType in eventTypes)
+      if (eventType.color != null) eventType.id: eventType.color!,
+  };
+}
+
 String? resolveEventTypeName(Map<String, String> eventTypeNames, String? eventTypeId) {
   if (eventTypeId == null || eventTypeId.isEmpty) {
     return null;

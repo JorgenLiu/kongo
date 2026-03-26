@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/event_draft.dart';
 import '../../providers/event_provider.dart';
 import '../../utils/contact_action_helpers.dart';
+import '../../config/page_transitions.dart';
 import '../../utils/navigation_helpers.dart';
 import 'event_detail_screen.dart';
 import 'event_form_screen.dart';
@@ -19,10 +20,14 @@ Future<void> openScheduleDetailFromList(BuildContext context, String eventId) as
 Future<bool> createScheduleFromList(
   BuildContext context, {
   String? suggestedContactId,
+  DateTime? initialStartAt,
 }) async {
   final draft = await Navigator.of(context).push<EventDraft>(
-    MaterialPageRoute(
-      builder: (_) => EventFormScreen(suggestedContactId: suggestedContactId),
+    SlidePageRoute(
+      builder: (_) => EventFormScreen(
+        suggestedContactId: suggestedContactId,
+        initialStartAt: initialStartAt,
+      ),
     ),
   );
 

@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
+import '../../models/calendar_time_node.dart';
 import '../../services/read/event_read_service.dart';
 import '../../utils/display_formatters.dart';
+import 'calendar_time_node_presentation.dart';
 
 class ScheduleWeekCalendar extends StatelessWidget {
   final List<EventListItemReadModel> items;
+  final List<CalendarTimeNodeReadModel> calendarTimeNodes;
   final DateTime? selectedDate;
   final DateTime? referenceDate;
   final ValueChanged<DateTime> onDateSelected;
@@ -14,6 +17,7 @@ class ScheduleWeekCalendar extends StatelessWidget {
   const ScheduleWeekCalendar({
     super.key,
     required this.items,
+    this.calendarTimeNodes = const [],
     required this.selectedDate,
     this.referenceDate,
     required this.onDateSelected,
@@ -41,6 +45,7 @@ class ScheduleWeekCalendar extends StatelessWidget {
                   child: _WeekDayCard(
                     date: day,
                     items: _itemsForDate(day),
+                    calendarTimeNodes: _nodesForDate(day),
                     selected: _isSameDate(day, selectedDate),
                     today: _isSameDate(day, referenceDate ?? DateTime.now()),
                     onDateSelected: () => onDateSelected(day),
@@ -61,6 +66,7 @@ class ScheduleWeekCalendar extends StatelessWidget {
                 child: _WeekDayCard(
                   date: days[index],
                   items: _itemsForDate(days[index]),
+                  calendarTimeNodes: _nodesForDate(days[index]),
                   selected: _isSameDate(days[index], selectedDate),
                   today: _isSameDate(days[index], referenceDate ?? DateTime.now()),
                   onDateSelected: () => onDateSelected(days[index]),
@@ -96,6 +102,11 @@ class ScheduleWeekCalendar extends StatelessWidget {
     return filtered;
   }
 
+  List<CalendarTimeNodeReadModel> _nodesForDate(DateTime date) {
+    final filtered = calendarTimeNodes.where((item) => item.occursOn(date)).toList(growable: false);
+    return filtered;
+  }
+
   bool _isSameDate(DateTime? left, DateTime? right) {
     if (left == null || right == null) {
       return false;
@@ -108,6 +119,7 @@ class ScheduleWeekCalendar extends StatelessWidget {
 class _WeekDayCard extends StatelessWidget {
   final DateTime date;
   final List<EventListItemReadModel> items;
+  final List<CalendarTimeNodeReadModel> calendarTimeNodes;
   final bool selected;
   final bool today;
   final VoidCallback onDateSelected;
@@ -116,6 +128,7 @@ class _WeekDayCard extends StatelessWidget {
   const _WeekDayCard({
     required this.date,
     required this.items,
+    this.calendarTimeNodes = const [],
     required this.selected,
     required this.today,
     required this.onDateSelected,
@@ -134,20 +147,25 @@ class _WeekDayCard extends StatelessWidget {
         builder: (context, constraints) {
           final displayItems = _resolveDisplayItems(constraints.maxHeight);
 
-          return Container(
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: selected
-                  ? colorScheme.primaryContainer
-                  : colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(AppRadius.lg),
-              border: Border.all(
-                color: selected
-                    ? colorScheme.primary.withValues(alpha: AppOpacity.medium)
-                    : colorScheme.outline.withValues(alpha: 0.22),
-              ),
-            ),
-            child: Column(
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+            child: Stack(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? colorScheme.primaryContainer
+                        : colorScheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(AppRadius.lg),
+                    border: Border.all(
+                      color: selected
+                          ? colorScheme.primary
+                              .withValues(alpha: AppOpacity.medium)
+                          : colorScheme.outline.withValues(alpha: 0.22),
+                    ),
+                  ),
+                  child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -181,6 +199,25 @@ class _WeekDayCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.md),
+                if (calendarTimeNodes.isNotEmpty) ...[
+                  Wrap(
+                    spacing: AppSpacing.xs,
+                    runSpacing: AppSpacing.xs,
+                    children: [
+                      for (final node in calendarTimeNodes.take(2))
+                        _WeekCalendarNodeChip(node: node),
+                      if (calendarTimeNodes.length > 2)
+                        Text(
+                          '+${calendarTimeNodes.length - 2} 个节点',
+                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                color: colorScheme.tertiary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
                 if (displayItems.isEmpty)
                   Text(
                     items.isEmpty ? '暂无日程' : '${items.length} 个日程',
@@ -217,6 +254,19 @@ class _WeekDayCard extends StatelessWidget {
                   ),
               ],
             ),
+                ),
+                if (selected)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 3,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+              ],
+            ),
           );
         },
       ),
@@ -233,7 +283,7 @@ class _WeekDayCard extends StatelessWidget {
       return AppDimensions.maxWeekDayEventPreview;
     }
 
-    const reservedHeight = 118.0;
+    final reservedHeight = calendarTimeNodes.isEmpty ? 118.0 : 174.0;
     const snippetHeight = 40.0;
     const overflowHeight = 24.0;
     final availableHeight = maxHeight - reservedHeight - overflowHeight;
@@ -244,6 +294,71 @@ class _WeekDayCard extends StatelessWidget {
   String _weekdayLabel(DateTime value) {
     const labels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
     return labels[value.weekday - 1];
+  }
+}
+
+class _WeekCalendarNodeChip extends StatelessWidget {
+  final CalendarTimeNodeReadModel node;
+
+  const _WeekCalendarNodeChip({required this.node});
+
+  @override
+  Widget build(BuildContext context) {
+    final visualStyle = resolveCalendarTimeNodeVisualStyle(context, node.kind);
+    final label = _chipLabel(node);
+
+    return Tooltip(
+      message: buildCalendarTimeNodeTooltip(node),
+      waitDuration: const Duration(milliseconds: 250),
+      child: Container(
+        key: Key('scheduleWeekCalendar_node_${node.id}'),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: visualStyle.backgroundColor,
+          borderRadius: BorderRadius.circular(AppRadius.sm),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 6,
+              height: 6,
+              margin: const EdgeInsets.only(right: 4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: visualStyle.foregroundColor,
+              ),
+            ),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: visualStyle.foregroundColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _chipLabel(CalendarTimeNodeReadModel node) {
+    return switch (node.kind) {
+      CalendarTimeNodeKind.contactMilestone =>
+        node.subtitle != null && node.subtitle!.trim().isNotEmpty
+            ? '${node.subtitle!} · ${node.title}'
+            : node.title,
+      CalendarTimeNodeKind.publicHoliday ||
+      CalendarTimeNodeKind.marketingCampaign =>
+        node.title,
+    };
   }
 }
 

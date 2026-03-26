@@ -5,9 +5,10 @@ import '../../models/event.dart';
 import '../../utils/display_formatters.dart';
 import '../search/highlighted_search_text.dart';
 
-class EventListItemCard extends StatelessWidget {
+class EventListItemCard extends StatefulWidget {
   final Event event;
   final String? eventTypeName;
+  final String? eventTypeColor;
   final List<String> participantNames;
   final String? highlightQuery;
   final VoidCallback? onTap;
@@ -18,6 +19,7 @@ class EventListItemCard extends StatelessWidget {
     super.key,
     required this.event,
     this.eventTypeName,
+    this.eventTypeColor,
     this.participantNames = const [],
     this.highlightQuery,
     this.onTap,
@@ -26,58 +28,107 @@ class EventListItemCard extends StatelessWidget {
   });
 
   @override
+  State<EventListItemCard> createState() => _EventListItemCardState();
+}
+
+class _EventListItemCardState extends State<EventListItemCard> {
+  bool _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final event = widget.event;
+    final hasActions = widget.onEdit != null || widget.onDelete != null;
     final metadata = <_MetaItem>[
-      if (eventTypeName != null && eventTypeName!.isNotEmpty)
-        _MetaItem(icon: Icons.sell_outlined, label: eventTypeName!),
+      if (widget.eventTypeName != null && widget.eventTypeName!.isNotEmpty)
+        _MetaItem(icon: Icons.sell_outlined, label: widget.eventTypeName!),
       if (event.location != null && event.location!.isNotEmpty)
         _MetaItem(icon: Icons.place_outlined, label: event.location!),
       if (event.startAt != null)
         _MetaItem(icon: Icons.schedule_outlined, label: formatDateTimeLabel(event.startAt!)),
     ];
 
-    return Card(
+    return Semantics(
+      label: '日程 ${event.title}${widget.eventTypeName != null ? '，类型 ${widget.eventTypeName}' : ''}${event.startAt != null ? '，时间 ${formatDateTimeLabel(event.startAt!)}' : ''}',
+      button: true,
+      child: MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOutCubic,
+      child: Card(
+      elevation: _hovering ? 2 : null,
       child: GestureDetector(
-        onSecondaryTapDown: (onEdit != null || onDelete != null)
+        onSecondaryTapDown: hasActions
             ? (details) => _showContextMenu(context, details.globalPosition)
             : null,
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          onTap: onTap,
-          hoverColor: colorScheme.primary.withValues(alpha: AppOpacity.subtle),
+          onTap: widget.onTap,
+          hoverColor: colorScheme.primary.withValues(alpha: 0.12),
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: 12,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
+                    ExcludeSemantics(
+                    child: Container(
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer,
+                        color: _eventTypeContainerColor(colorScheme),
                         borderRadius: BorderRadius.circular(AppRadius.md),
                       ),
                       alignment: Alignment.center,
                       child: Icon(
                         Icons.event_note_outlined,
                         size: 20,
-                        color: colorScheme.primary,
+                        color: _eventTypeIconColor(colorScheme),
                       ),
+                    ),
                     ),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: HighlightedSearchText(
                         text: event.title,
-                        query: highlightQuery,
+                        query: widget.highlightQuery,
                         style: const TextStyle(
                           fontSize: AppFontSize.titleMedium,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
+                    ),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 150),
+                      child: _hovering && hasActions
+                          ? Row(
+                              key: const ValueKey('actions'),
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (widget.onEdit != null)
+                                  _buildHoverAction(
+                                    icon: Icons.edit_outlined,
+                                    tooltip: '编辑',
+                                    onPressed: widget.onEdit!,
+                                    color: colorScheme.primary,
+                                  ),
+                                if (widget.onDelete != null)
+                                  _buildHoverAction(
+                                    icon: Icons.delete_outline,
+                                    tooltip: '删除',
+                                    onPressed: widget.onDelete!,
+                                    color: colorScheme.error,
+                                  ),
+                              ],
+                            )
+                          : const SizedBox.shrink(key: ValueKey('empty')),
                     ),
                   ],
                 ),
@@ -89,7 +140,7 @@ class EventListItemCard extends StatelessWidget {
                     children: metadata.map((item) => _buildMetaPill(context, item)).toList(),
                   ),
                 ],
-                if (participantNames.isNotEmpty) ...[
+                if (widget.participantNames.isNotEmpty) ...[
                   const SizedBox(height: AppSpacing.sm),
                   Row(
                     children: [
@@ -101,8 +152,8 @@ class EventListItemCard extends StatelessWidget {
                       const SizedBox(width: AppSpacing.xs),
                       Expanded(
                         child: HighlightedSearchText(
-                          text: participantNames.join('、'),
-                          query: highlightQuery,
+                          text: widget.participantNames.join('、'),
+                          query: widget.highlightQuery,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: colorScheme.outline),
@@ -123,7 +174,7 @@ class EventListItemCard extends StatelessWidget {
                     ),
                     child: HighlightedSearchText(
                       text: event.description!,
-                      query: highlightQuery,
+                      query: widget.highlightQuery,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodyMedium,
@@ -135,13 +186,35 @@ class EventListItemCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
+    ),
+    ),
+    );
+  }
+
+  Widget _buildHoverAction({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: IconButton(
+        icon: Icon(icon, size: 18),
+        tooltip: tooltip,
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        color: color,
+      ),
     );
   }
 
   void _showContextMenu(BuildContext context, Offset position) {
     final colorScheme = Theme.of(context).colorScheme;
     final items = <PopupMenuEntry<String>>[];
-    if (onEdit != null) {
+    if (widget.onEdit != null) {
       items.add(PopupMenuItem(
         value: 'edit',
         child: Row(
@@ -153,7 +226,7 @@ class EventListItemCard extends StatelessWidget {
         ),
       ));
     }
-    if (onDelete != null) {
+    if (widget.onDelete != null) {
       items.add(PopupMenuItem(
         value: 'delete',
         child: Row(
@@ -171,8 +244,8 @@ class EventListItemCard extends StatelessWidget {
       position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
       items: items,
     ).then((value) {
-      if (value == 'edit') onEdit?.call();
-      if (value == 'delete') onDelete?.call();
+      if (value == 'edit') widget.onEdit?.call();
+      if (value == 'delete') widget.onDelete?.call();
     });
   }
 
@@ -201,7 +274,7 @@ class EventListItemCard extends StatelessWidget {
           Flexible(
             child: HighlightedSearchText(
               text: item.label,
-              query: highlightQuery,
+              query: widget.highlightQuery,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -213,6 +286,23 @@ class EventListItemCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Color? _parseHex(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    final raw = hex.replaceFirst('#', '');
+    final value = int.tryParse(raw, radix: 16);
+    if (value == null) return null;
+    return raw.length == 6 ? Color(0xFF000000 | value) : Color(value);
+  }
+
+  Color _eventTypeContainerColor(ColorScheme scheme) {
+    final c = _parseHex(widget.eventTypeColor);
+    return c?.withAlpha(38) ?? scheme.primaryContainer;
+  }
+
+  Color _eventTypeIconColor(ColorScheme scheme) {
+    return _parseHex(widget.eventTypeColor) ?? scheme.primary;
   }
 }
 

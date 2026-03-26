@@ -1,11 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
 import 'package:kongo/config/app_colors.dart';
 import 'package:kongo/main.dart';
 import 'package:kongo/models/attachment.dart';
 import 'package:kongo/models/event.dart';
+import 'package:kongo/providers/contact_detail_provider.dart';
+import 'package:kongo/providers/calendar_time_node_settings_provider.dart';
+import 'package:kongo/providers/home_provider.dart';
+import 'package:kongo/providers/theme_notifier.dart';
+import 'package:kongo/screens/app_shell_screen.dart';
+import 'package:kongo/screens/settings/settings_overview_screen.dart';
 import 'package:kongo/widgets/contact/contact_card.dart';
 import 'package:kongo/widgets/event/attachment_list.dart';
 import 'package:kongo/widgets/event/monthly_event_calendar.dart';
@@ -27,11 +34,89 @@ Future<void> pumpUntilFound(
   fail('Timed out waiting for expected widget');
 }
 
+Future<void> pumpUntil(
+  WidgetTester tester,
+  bool Function() predicate, {
+  int maxAttempts = 100,
+}) async {
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    if (predicate()) {
+      return;
+    }
+  }
+
+  fail('Timed out waiting for expected state');
+}
+
+Future<void> pumpUntilGone(
+  WidgetTester tester,
+  Finder finder, {
+  int maxAttempts = 100,
+}) async {
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    await tester.pump(const Duration(milliseconds: 100));
+    if (finder.evaluate().isEmpty) {
+      return;
+    }
+  }
+
+  fail('Timed out waiting for widget to disappear');
+}
+
+Future<void> drainPendingDatabaseTimers(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox.shrink());
+  await tester.pump();
+}
+
+Future<void> waitForHomeOverviewReady(WidgetTester tester) async {
+  final headerFinder = find.byKey(const Key('homePageHeaderTitle'));
+  await pumpUntilFound(tester, headerFinder);
+  final context = tester.element(headerFinder);
+  final provider = Provider.of<HomeProvider>(context, listen: false);
+  for (var attempt = 0; attempt < 100; attempt++) {
+    if (!provider.loading) {
+      await tester.pump();
+      return;
+    }
+
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    });
+    await tester.pump();
+  }
+
+  fail('Timed out waiting for home provider to settle');
+}
+
+Future<void> waitForContactDetailReady(WidgetTester tester) async {
+  final titleFinder = find.text('联系人详情');
+  await pumpUntilFound(tester, titleFinder);
+  final context = tester.element(titleFinder);
+  final provider = Provider.of<ContactDetailProvider>(context, listen: false);
+  for (var attempt = 0; attempt < 100; attempt++) {
+    if (!provider.loading && provider.data != null) {
+      await tester.pump();
+      return;
+    }
+
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    });
+    await tester.pump();
+  }
+
+  fail('Timed out waiting for contact detail provider to settle');
+}
+
 void main() {
   late TestAppHarness harness;
 
   setUp(() async {
     harness = await createTestAppHarness();
+    await harness.dependencies.contactProvider.loadContacts();
+    await harness.dependencies.tagProvider.loadTags();
+    await harness.dependencies.summaryProvider.loadSummaries();
     await harness.dependencies.filesProvider.loadFiles();
   });
 
@@ -39,11 +124,22 @@ void main() {
     await harness.dispose();
   });
 
-  testWidgets('App shell defaults to events and switches to summary module', (WidgetTester tester) async {
+  testWidgets('App shell defaults to workbench and switches to summary module', (WidgetTester tester) async {
     await tester.pumpWidget(MyApp(dependencies: harness.dependencies));
-    await pumpUntilFound(tester, find.byKey(const Key('eventsPageHeaderTitle')));
+    await waitForHomeOverviewReady(tester);
+    final settingsProvider = Provider.of<CalendarTimeNodeSettingsProvider>(
+      tester.element(find.byType(AppShellScreen)),
+      listen: false,
+    );
+    expect(settingsProvider.loading, isA<bool>());
 
-    expect(find.byKey(const Key('eventsPageHeaderTitle')), findsOneWidget);
+    expect(find.byKey(const Key('homePageHeaderTitle')), findsOneWidget);
+  expect(find.text('本周概况'), findsOneWidget);
+  expect(find.text('今日日程'), findsOneWidget);
+  expect(find.text('今天暂无安排'), findsOneWidget);
+  expect(find.text('新建事件'), findsOneWidget);
+  expect(find.text('新建联系人'), findsOneWidget);
+  expect(find.text('新总结'), findsNothing);
     expect(find.text('主页'), findsNothing);
     expect(find.text('标签'), findsNothing);
 
@@ -53,32 +149,62 @@ void main() {
     expect(find.byKey(const Key('summaryPageHeaderTitle')), findsOneWidget);
     expect(find.text('新建总结'), findsOneWidget);
 
-    await tester.pump(const Duration(seconds: 11));
+    await drainPendingDatabaseTimers(tester);
+
   });
 
   testWidgets('App shell exposes global search entry', (WidgetTester tester) async {
     await tester.pumpWidget(MyApp(dependencies: harness.dependencies));
-    await pumpUntilFound(tester, find.byKey(const Key('eventsPageHeaderTitle')));
+    await waitForHomeOverviewReady(tester);
 
     await tester.tap(find.text('检索').last);
     await pumpUntilFound(tester, find.byKey(const Key('globalSearchPageHeaderTitle')));
 
     expect(find.byKey(const Key('globalSearchPageHeaderTitle')), findsOneWidget);
     expect(find.text('输入关键词开始检索'), findsOneWidget);
+
+    await drainPendingDatabaseTimers(tester);
   });
 
   testWidgets('Settings screen exposes tag management after tags leave bottom navigation', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(MyApp(dependencies: harness.dependencies));
-    await pumpUntilFound(tester, find.byKey(const Key('eventsPageHeaderTitle')));
-
-    await tester.tap(find.text('设置').last);
-    await pumpUntilFound(tester, find.byKey(const Key('settingsPageHeaderTitle')));
-    await pumpUntilFound(tester, find.text('打开分组管理'));
+    await waitForHomeOverviewReady(tester);
 
     expect(find.text('标签').evaluate(), isEmpty);
-    expect(find.text('打开分组管理'), findsOneWidget);
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(
+            create: (_) => ThemeNotifier(harness.dependencies.settingsPreferencesStore),
+          ),
+          ChangeNotifierProvider(
+            create: (_) => CalendarTimeNodeSettingsProvider(
+              harness.dependencies.calendarTimeNodeSettingsService,
+            ),
+          ),
+          ChangeNotifierProvider.value(value: harness.dependencies.contactProvider),
+          ChangeNotifierProvider.value(value: harness.dependencies.tagProvider),
+        ],
+        child: MaterialApp(
+          theme: ThemeData(useMaterial3: true),
+          home: const SettingsOverviewScreen(),
+        ),
+      ),
+    );
+    await pumpUntilFound(tester, find.byKey(const Key('settingsPageHeaderTitle')));
+    await tester.scrollUntilVisible(
+      find.text('分组管理'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pump();
+
+    expect(find.text('分组管理'), findsOneWidget);
+
+    await drainPendingDatabaseTimers(tester);
   });
 
   testWidgets('Desktop shell keeps left navigation when opening contact detail', (
@@ -90,6 +216,7 @@ void main() {
     try {
       await tester.pumpWidget(MyApp(dependencies: harness.dependencies));
       await pumpUntilFound(tester, find.text('Kongo'));
+      await waitForHomeOverviewReady(tester);
 
       await tester.tap(find.byIcon(Icons.contacts_outlined).last);
       await pumpUntilFound(tester, find.byKey(const Key('contactsPageHeaderTitle')));
@@ -97,12 +224,12 @@ void main() {
       await tester.tap(find.byType(ContactCard).first);
       await tester.pump();
       await pumpUntilFound(tester, find.text('联系人详情'));
-      await tester.pump(const Duration(milliseconds: 200));
+      await waitForContactDetailReady(tester);
 
       expect(find.text('Kongo'), findsOneWidget);
       expect(find.text('联系人详情'), findsOneWidget);
 
-      await tester.pump(const Duration(seconds: 11));
+      await drainPendingDatabaseTimers(tester);
     } finally {
       debugDefaultTargetPlatformOverride = null;
       await tester.binding.setSurfaceSize(null);
@@ -118,6 +245,7 @@ void main() {
     try {
       await tester.pumpWidget(MyApp(dependencies: harness.dependencies));
       await pumpUntilFound(tester, find.text('Kongo'));
+      await waitForHomeOverviewReady(tester);
 
       await tester.tap(find.byIcon(Icons.contacts_outlined).last);
       await pumpUntilFound(tester, find.byKey(const Key('contactsPageHeaderTitle')));
@@ -134,7 +262,7 @@ void main() {
       expect(find.text('Kongo'), findsOneWidget);
       expect(find.text('分组管理'), findsOneWidget);
 
-      await tester.pump(const Duration(seconds: 11));
+      await drainPendingDatabaseTimers(tester);
     } finally {
       debugDefaultTargetPlatformOverride = null;
       await tester.binding.setSurfaceSize(null);
@@ -150,6 +278,7 @@ void main() {
     try {
       await tester.pumpWidget(MyApp(dependencies: harness.dependencies));
       await pumpUntilFound(tester, find.text('Kongo'));
+      await waitForHomeOverviewReady(tester);
 
       await tester.tap(find.byIcon(Icons.contacts_outlined).last);
       await pumpUntilFound(tester, find.byKey(const Key('contactsPageHeaderTitle')));
@@ -188,7 +317,7 @@ void main() {
       expect(find.byKey(const Key('contactsPageHeaderTitle')), findsOneWidget);
       expect(find.byKey(const Key('contactForm_nameField')), findsNothing);
 
-      await tester.pump(const Duration(seconds: 11));
+      await drainPendingDatabaseTimers(tester);
     } finally {
       debugDefaultTargetPlatformOverride = null;
       await tester.binding.setSurfaceSize(null);
@@ -204,6 +333,7 @@ void main() {
     try {
       await tester.pumpWidget(MyApp(dependencies: harness.dependencies));
       await pumpUntilFound(tester, find.text('Kongo'));
+      await waitForHomeOverviewReady(tester);
 
       await tester.tap(find.byTooltip('收起侧栏'));
       await tester.pump();
@@ -222,7 +352,7 @@ void main() {
       expect(find.byTooltip('收起侧栏'), findsOneWidget);
       expect(tester.takeException(), isNull);
 
-      await tester.pump(const Duration(seconds: 11));
+      await drainPendingDatabaseTimers(tester);
     } finally {
       debugDefaultTargetPlatformOverride = null;
       await tester.binding.setSurfaceSize(null);

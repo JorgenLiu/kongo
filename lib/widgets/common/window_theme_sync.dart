@@ -1,22 +1,24 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+
+import '../../services/platform_window_chrome_service.dart';
 
 class WindowThemeSync extends StatefulWidget {
   final Widget child;
+  final PlatformWindowChromeService _chromeService;
 
   const WindowThemeSync({
     super.key,
     required this.child,
-  });
+    PlatformWindowChromeService chromeService =
+        const DefaultPlatformWindowChromeService(),
+  }) : _chromeService = chromeService;
 
   @override
   State<WindowThemeSync> createState() => _WindowThemeSyncState();
 }
 
 class _WindowThemeSyncState extends State<WindowThemeSync> {
-  static const MethodChannel _channel = MethodChannel('kongo/window_chrome');
-
   int? _lastBackgroundColor;
   Brightness? _lastBrightness;
 
@@ -53,16 +55,10 @@ class _WindowThemeSyncState extends State<WindowThemeSync> {
     _lastBackgroundColor = backgroundColor;
     _lastBrightness = brightness;
 
-    try {
-      await _channel.invokeMethod<void>('updateWindowChrome', {
-        'title': 'Kongo',
-        'backgroundColor': backgroundColor,
-        'dark': brightness == Brightness.dark,
-      });
-    } on MissingPluginException {
-      return;
-    } on PlatformException {
-      return;
-    }
+    await widget._chromeService.updateWindowChrome(
+      title: 'Kongo',
+      backgroundColor: backgroundColor,
+      dark: brightness == Brightness.dark,
+    );
   }
 }

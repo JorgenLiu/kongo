@@ -4,7 +4,7 @@ import '../../config/app_constants.dart';
 import '../../models/contact.dart';
 
 /// 联系人列表项卡片
-class ContactCard extends StatelessWidget {
+class ContactCard extends StatefulWidget {
   final Contact contact;
   final bool selected;
   final VoidCallback? onTap;
@@ -21,25 +21,45 @@ class ContactCard extends StatelessWidget {
   });
 
   @override
+  State<ContactCard> createState() => _ContactCardState();
+}
+
+class _ContactCardState extends State<ContactCard> {
+  static const double _actionSlotWidth = 76;
+  bool _hovering = false;
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final groupLabels = contact.tags.take(3).toList();
-    final remainingGroupCount = contact.tags.length > 3 ? contact.tags.length - 3 : 0;
+    final contact = widget.contact;
+    final groupLabels = contact.tags.take(2).toList();
+    final remainingGroupCount = contact.tags.length > 2 ? contact.tags.length - 2 : 0;
+    final hasActions = widget.onEdit != null || widget.onDelete != null;
 
-    return Card(
-      color: selected ? colorScheme.primaryContainer.withValues(alpha: AppOpacity.half) : null,
+    return Semantics(
+      label: '联系人 ${contact.name}${contact.phone != null && contact.phone!.isNotEmpty ? '，电话 ${contact.phone}' : ''}',
+      button: true,
+      child: MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOutCubic,
+      child: Card(
+      elevation: _hovering ? 2 : null,
+      color: widget.selected ? colorScheme.primaryContainer.withValues(alpha: AppOpacity.half) : null,
       child: GestureDetector(
-        onSecondaryTapDown: (onEdit != null || onDelete != null)
+        onSecondaryTapDown: hasActions
             ? (details) => _showContextMenu(context, details.globalPosition)
             : null,
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          onTap: onTap,
-          hoverColor: colorScheme.primary.withValues(alpha: AppOpacity.subtle),
+          onTap: widget.onTap,
+          hoverColor: colorScheme.primary.withValues(alpha: 0.12),
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
+              vertical: 12,
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -106,14 +126,65 @@ class ContactCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: colorScheme.outline,
-                ),
+                if (hasActions)
+                  SizedBox(
+                    width: _actionSlotWidth,
+                    child: IgnorePointer(
+                      ignoring: !_hovering,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 150),
+                        opacity: _hovering ? 1 : 0,
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (widget.onEdit != null)
+                                _buildHoverAction(
+                                  icon: Icons.edit_outlined,
+                                  tooltip: '编辑',
+                                  onPressed: widget.onEdit!,
+                                  color: colorScheme.primary,
+                                ),
+                              if (widget.onDelete != null)
+                                _buildHoverAction(
+                                  icon: Icons.delete_outline,
+                                  tooltip: '删除',
+                                  onPressed: widget.onDelete!,
+                                  color: colorScheme.error,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
         ),
+      ),
+    ),
+    ),
+    ),
+    );
+  }
+
+  Widget _buildHoverAction({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Color color,
+  }) {
+    return SizedBox(
+      width: 32,
+      height: 32,
+      child: IconButton(
+        icon: Icon(icon, size: 18),
+        tooltip: tooltip,
+        onPressed: onPressed,
+        padding: EdgeInsets.zero,
+        color: color,
       ),
     );
   }
@@ -121,7 +192,7 @@ class ContactCard extends StatelessWidget {
   void _showContextMenu(BuildContext context, Offset position) {
     final colorScheme = Theme.of(context).colorScheme;
     final items = <PopupMenuEntry<String>>[];
-    if (onEdit != null) {
+    if (widget.onEdit != null) {
       items.add(PopupMenuItem(
         value: 'edit',
         child: Row(
@@ -133,7 +204,7 @@ class ContactCard extends StatelessWidget {
         ),
       ));
     }
-    if (onDelete != null) {
+    if (widget.onDelete != null) {
       items.add(PopupMenuItem(
         value: 'delete',
         child: Row(
@@ -151,15 +222,16 @@ class ContactCard extends StatelessWidget {
       position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
       items: items,
     ).then((value) {
-      if (value == 'edit') onEdit?.call();
-      if (value == 'delete') onDelete?.call();
+      if (value == 'edit') widget.onEdit?.call();
+      if (value == 'delete') widget.onDelete?.call();
     });
   }
 
   Widget _buildAvatar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
+    return ExcludeSemantics(
+      child: Container(
       width: AppDimensions.contactAvatarSize,
       height: AppDimensions.contactAvatarSize,
       decoration: BoxDecoration(
@@ -168,24 +240,25 @@ class ContactCard extends StatelessWidget {
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       alignment: Alignment.center,
-      child: contact.avatar != null
+      child: widget.contact.avatar != null
           ? ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.md - 2),
               child: Image.network(
-                contact.avatar!,
+                widget.contact.avatar!,
                 width: AppDimensions.contactAvatarSize,
                 height: AppDimensions.contactAvatarSize,
                 fit: BoxFit.cover,
               ),
             )
           : Text(
-              contact.name.isNotEmpty ? contact.name[0].toUpperCase() : '?',
+              widget.contact.name.isNotEmpty ? widget.contact.name[0].toUpperCase() : '?',
               style: TextStyle(
                 color: colorScheme.onPrimaryContainer,
                 fontSize: AppFontSize.titleMedium,
                 fontWeight: FontWeight.bold,
               ),
             ),
+    ),
     );
   }
 

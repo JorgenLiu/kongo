@@ -60,7 +60,7 @@ void main() {
 
     expect(find.byKey(const Key('scheduleTodayTimeline')), findsOneWidget);
     expect(find.byKey(const Key('scheduleTimelineHour_09')), findsOneWidget);
-    expect(find.byKey(const Key('scheduleTimelineHour_10')), findsOneWidget);
+    // Hour 10 is empty and collapsed into a range, so no individual key
     expect(find.byKey(const Key('scheduleTimelineHour_11')), findsOneWidget);
     expect(find.text('晨会'), findsOneWidget);
     expect(find.text('午间同步'), findsOneWidget);

@@ -23,14 +23,17 @@ Future<void> pumpUntilFound(
   fail('Timed out waiting for expected widget');
 }
 
-Widget buildEventFormScreen(TestAppHarness harness) {
+Widget buildEventFormScreen(
+  TestAppHarness harness, {
+  DateTime? initialStartAt,
+}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<EventProvider>.value(value: harness.dependencies.eventProvider),
       ChangeNotifierProvider<TagProvider>.value(value: harness.dependencies.tagProvider),
     ],
-    child: const MaterialApp(
-      home: EventFormScreen(),
+    child: MaterialApp(
+      home: EventFormScreen(initialStartAt: initialStartAt),
       debugShowCheckedModeBanner: false,
     ),
   );
@@ -100,5 +103,19 @@ void main() {
 
     expect(find.byKey(Key('eventForm_removeParticipant_$zhangSanId')), findsOneWidget);
     expect(find.byKey(Key('eventForm_selectedParticipant_$zhangSanId')), findsOneWidget);
+  });
+
+  testWidgets('Event form uses provided initial start time', (
+    WidgetTester tester,
+  ) async {
+    final initialStartAt = DateTime(2026, 3, 26, 14, 0);
+
+    await tester.pumpWidget(
+      buildEventFormScreen(harness, initialStartAt: initialStartAt),
+    );
+    await pumpUntilFound(tester, find.byKey(const Key('eventForm_startDateField')));
+
+    expect(find.text('2026-03-26'), findsOneWidget);
+    expect(find.text('14:00'), findsOneWidget);
   });
 }

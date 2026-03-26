@@ -40,6 +40,12 @@ class EventSearchFilterBar extends StatelessWidget {
               for (final eventType in eventTypes) ...[
                 const SizedBox(width: AppSpacing.sm),
                 ChoiceChip(
+                  avatar: eventType.color != null
+                      ? CircleAvatar(
+                          radius: 6,
+                          backgroundColor: _parseColor(eventType.color!),
+                        )
+                      : null,
                   label: Text(eventType.name),
                   selected: selectedEventTypeId == eventType.id,
                   visualDensity: VisualDensity.compact,
@@ -54,5 +60,13 @@ class EventSearchFilterBar extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static Color _parseColor(String hex) {
+    final cleaned = hex.replaceFirst('#', '');
+    if (cleaned.length == 6) {
+      return Color(int.parse('FF$cleaned', radix: 16));
+    }
+    return Color(int.parse(cleaned, radix: 16));
   }
 }

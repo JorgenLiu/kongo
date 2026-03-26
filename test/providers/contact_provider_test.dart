@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:kongo/models/contact_draft.dart';
+import 'package:kongo/models/contact_milestone.dart';
+import 'package:kongo/models/contact_milestone_draft.dart';
 import 'package:kongo/models/tag_draft.dart';
 import 'package:kongo/providers/provider_error.dart';
 
@@ -151,6 +153,40 @@ void main() {
 
     expect(provider.contacts.length, 7);
     expect(provider.contacts.any((item) => item.id == contact.id), isFalse);
+    expect(provider.error, isNull);
+  });
+
+  test('ContactProvider loads upcoming important dates including one-time dates', () async {
+    final provider = harness.dependencies.contactProvider;
+    final firstContact = provider.contacts.first;
+    final today = DateTime.now();
+
+    await harness.dependencies.contactMilestoneService.createMilestone(
+      firstContact.id,
+      ContactMilestoneDraft(
+        type: ContactMilestoneType.birthday,
+        milestoneDate: DateTime(today.year - 10, today.month, today.day + 3),
+        isRecurring: true,
+      ),
+    );
+    await harness.dependencies.contactMilestoneService.createMilestone(
+      firstContact.id,
+      ContactMilestoneDraft(
+        type: ContactMilestoneType.custom,
+        label: '签约日',
+        milestoneDate: DateTime(today.year, today.month, today.day + 5),
+        isRecurring: false,
+      ),
+    );
+
+    await provider.loadContacts();
+
+    expect(provider.upcomingMilestones.length, 2);
+    expect(provider.upcomingMilestones.first.contact.id, firstContact.id);
+    expect(
+      provider.upcomingMilestones.map((item) => item.milestone.displayName),
+      containsAll(<String>['生日', '签约日']),
+    );
     expect(provider.error, isNull);
   });
 

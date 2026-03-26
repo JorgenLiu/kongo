@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/app_constants.dart';
+import '../../providers/calendar_time_node_settings_provider.dart';
 import '../../providers/events_list_provider.dart';
 import '../../services/event_service.dart';
 import '../../services/read/event_read_service.dart';
+import '../../utils/input_debouncer.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/error_state.dart';
+import '../../widgets/common/skeleton_list.dart';
 import '../../widgets/common/search_bar.dart' as custom_search;
-import '../../widgets/common/workbench_page_header.dart';
 import '../../widgets/event/event_search_filter_bar.dart';
 import '../../widgets/event/event_search_results_list.dart';
 import '../../widgets/event/schedule_grouped_event_list.dart';
+import '../../widgets/event/schedule_list_header.dart';
 import '../../widgets/event/schedule_overview_header.dart';
 import '../../widgets/event/schedule_today_timeline.dart';
 import 'events_list_actions.dart';
@@ -20,12 +23,14 @@ class EventsListScreen extends StatelessWidget {
   final String? contactId;
   final String? contactName;
   final bool showAppBar;
+  final DateTime? initialSelectedDate;
 
   const EventsListScreen({
     super.key,
     this.contactId,
     this.contactName,
     this.showAppBar = false,
+    this.initialSelectedDate,
   });
 
   @override
@@ -35,11 +40,14 @@ class EventsListScreen extends StatelessWidget {
         context.read<EventReadService>(),
         context.read<EventService>(),
         contactId: contactId,
+        calendarTimeNodeSettingsListenable:
+            context.read<CalendarTimeNodeSettingsProvider>(),
       ),
       child: _EventsListView(
         contactId: contactId,
         contactName: contactName,
         showAppBar: showAppBar,
+        initialSelectedDate: initialSelectedDate,
       ),
     );
   }
@@ -49,11 +57,13 @@ class _EventsListView extends StatefulWidget {
   final String? contactId;
   final String? contactName;
   final bool showAppBar;
+  final DateTime? initialSelectedDate;
 
   const _EventsListView({
     this.contactId,
     this.contactName,
     required this.showAppBar,
+    this.initialSelectedDate,
   });
 
   @override
@@ -63,13 +73,16 @@ class _EventsListView extends StatefulWidget {
 class _EventsListViewState extends State<_EventsListView> {
   late DateTime _selectedDate;
   late final TextEditingController _searchController;
+  late final InputDebouncer _searchDebouncer;
   ScheduleCalendarMode _calendarMode = ScheduleCalendarMode.week;
+  bool _showSearchFilter = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
+    _selectedDate = _resolveSelectedDate(widget.initialSelectedDate ?? DateTime.now());
     _searchController = TextEditingController();
+    _searchDebouncer = InputDebouncer();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<EventsListProvider>();
       if (!provider.initialized && !provider.loading) {
@@ -80,21 +93,36 @@ class _EventsListViewState extends State<_EventsListView> {
 
   @override
   void dispose() {
+    _searchDebouncer.dispose();
     _searchController.dispose();
     super.dispose();
   }
 
   void _searchEvents(String keyword) {
-    context.read<EventsListProvider>().searchByKeyword(keyword);
+    _searchDebouncer.run(() {
+      if (!mounted) {
+        return;
+      }
+
+      context.read<EventsListProvider>().searchByKeyword(keyword);
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebouncer.cancel();
+    context.read<EventsListProvider>().clearFilters();
   }
 
   Widget _buildBody(BuildContext context, EventsListProvider provider) {
     if (provider.loading && provider.data == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const SkeletonList(key: ValueKey('events_skeleton'));
     }
 
     if (provider.error != null && provider.data == null) {
-      return _buildErrorState(provider);
+      return KeyedSubtree(
+        key: const ValueKey('events_error'),
+        child: _buildErrorState(provider),
+      );
     }
 
     final data = provider.data;
@@ -137,6 +165,7 @@ class _EventsListViewState extends State<_EventsListView> {
           items: data.items,
           referenceDate: _selectedDate,
           onItemTap: (item) => _handleOpenScheduleDetail(context, item.event.id, provider),
+          onCreateEvent: () => _handleCreateScheduleForDate(context, provider, _selectedDate),
         ),
       );
     }
@@ -215,159 +244,174 @@ class _EventsListViewState extends State<_EventsListView> {
     await provider.refresh();
   }
 
-  Widget _buildTopHeader(BuildContext context, EventsListProvider provider) {
-    final isScoped = widget.contactId != null && widget.contactName != null;
+  Future<void> _handleCreateScheduleForDate(
+    BuildContext context,
+    EventsListProvider provider,
+    DateTime date,
+  ) async {
+    final initialStart = DateTime(date.year, date.month, date.day, DateTime.now().hour);
+    final created = await createScheduleFromList(
+      context,
+      suggestedContactId: widget.contactId,
+      initialStartAt: initialStart,
+    );
 
-    if (!isScoped) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.md,
-          AppSpacing.md,
-          AppSpacing.md,
-        ),
-        child: WorkbenchPageHeader(
-          eyebrow: 'Schedule',
-          title: '日程',
-          titleKey: const Key('eventsPageHeaderTitle'),
-          trailing: Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            alignment: WrapAlignment.end,
-            children: [
-              SegmentedButton<ScheduleCalendarMode>(
-                key: const Key('scheduleCalendarModeToggle'),
-                segments: const [
-                  ButtonSegment(
-                    value: ScheduleCalendarMode.week,
-                    label: Text('本周'),
-                    icon: Icon(Icons.view_week_outlined),
-                  ),
-                  ButtonSegment(
-                    value: ScheduleCalendarMode.month,
-                    label: Text('本月'),
-                    icon: Icon(Icons.calendar_month_outlined),
-                  ),
-                ],
-                selected: <ScheduleCalendarMode>{_calendarMode},
-                onSelectionChanged: (selection) {
-                  setState(() {
-                    _calendarMode = selection.first;
-                  });
-                },
-              ),
-              FilledButton.icon(
-                onPressed: () => _handleCreateSchedule(context, provider),
-                icon: const Icon(Icons.add),
-                label: const Text('新建日程'),
-              ),
-            ],
-          ),
-          metadata: [
-            ScheduleOverviewHeader(
-              items: provider.data?.items ?? const [],
-              calendarMode: _calendarMode,
-              selectedDate: _selectedDate,
-              referenceDate: _selectedDate,
-              onDateSelected: (value) {
-                setState(() {
-                  _selectedDate = _resolveSelectedDate(value ?? DateTime.now());
-                });
-              },
-              onItemTap: (item) => _handleOpenScheduleDetail(context, item.event.id, provider),
-            ),
-          ],
-        ),
-      );
+    if (!created || !context.mounted) {
+      return;
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-        AppSpacing.md,
-      ),
-      child: WorkbenchPageHeader(
-        eyebrow: 'Schedule',
-        title: '${widget.contactName} 的日程',
-        titleKey: const Key('eventsPageHeaderTitle'),
-        trailing: FilledButton.icon(
-          onPressed: () => _handleCreateSchedule(context, provider),
-          icon: const Icon(Icons.add),
-          label: const Text('新建日程'),
-        ),
-      ),
+    await provider.refresh();
+  }
+
+  Widget _buildTopHeader(BuildContext context, EventsListProvider provider) {
+    return ScheduleListHeaderWidget(
+      contactName: widget.contactName,
+      calendarMode: _calendarMode,
+      selectedDate: _selectedDate,
+      items: provider.data?.items ?? const [],
+      calendarTimeNodes: provider.data?.calendarTimeNodes ?? const [],
+      onCalendarModeChanged: (mode) {
+        setState(() {
+          _calendarMode = mode;
+        });
+      },
+      onWeekNavigate: (date) {
+        setState(() {
+          _selectedDate = date;
+        });
+      },
+      onDateSelected: (value) {
+        setState(() {
+          _selectedDate = _resolveSelectedDate(value ?? DateTime.now());
+        });
+      },
+      onCreateSchedule: () => _handleCreateSchedule(context, provider),
+      onItemTap: (item) => _handleOpenScheduleDetail(context, item.event.id, provider),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<EventsListProvider>(
-      builder: (context, provider, _) => Scaffold(
-        appBar: widget.showAppBar
-            ? AppBar(
-                title: Text(widget.contactName == null ? '日程' : '${widget.contactName} 的日程'),
-              )
-            : null,
-        body: SafeArea(
-          child: Column(
-            children: [
-              if (!widget.showAppBar) _buildTopHeader(context, provider),
-              custom_search.SearchBar(
-                controller: _searchController,
-                hintText: widget.contactId == null ? '搜索日程、地点或备注...' : '搜索该联系人的日程...',
-                onChanged: _searchEvents,
-                onClear: provider.clearFilters,
+    return Scaffold(
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: Text(widget.contactName == null ? '日程' : '${widget.contactName} 的日程'),
+            )
+          : null,
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (!widget.showAppBar)
+              Consumer<EventsListProvider>(
+                builder: (context, provider, _) => _buildTopHeader(context, provider),
               ),
-              EventSearchFilterBar(
-                eventTypes: provider.eventTypes,
-                selectedEventTypeId: provider.selectedEventTypeId,
-                onChanged: provider.filterByEventType,
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md,
-                  vertical: AppSpacing.xs,
-                ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    provider.keyword.trim().isEmpty
-                        ? '共 ${provider.data?.items.length ?? 0} 条日程'
-                        : '找到 ${provider.data?.items.length ?? 0} 条日程',
-                    style: TextStyle(
-                      fontSize: AppFontSize.bodySmall,
-                      color: Theme.of(context).colorScheme.outline,
+            Consumer<EventsListProvider>(
+              builder: (context, provider, _) {
+                final hasActiveFilter = provider.keyword.trim().isNotEmpty ||
+                    provider.selectedEventTypeId != null;
+                return Column(
+                  children: [
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      alignment: Alignment.topCenter,
+                      child: (_showSearchFilter || hasActiveFilter)
+                          ? Column(
+                              children: [
+                                custom_search.SearchBar(
+                                  controller: _searchController,
+                                  hintText: widget.contactId == null
+                                      ? '搜索日程、地点或备注...'
+                                      : '搜索该联系人的日程...',
+                                  onChanged: _searchEvents,
+                                  onClear: _clearSearch,
+                                ),
+                                EventSearchFilterBar(
+                                  eventTypes: provider.eventTypes,
+                                  selectedEventTypeId:
+                                      provider.selectedEventTypeId,
+                                  onChanged: provider.filterByEventType,
+                                ),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
                     ),
-                  ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              provider.keyword.trim().isEmpty
+                                  ? '共 ${provider.data?.items.length ?? 0} 条日程'
+                                  : '找到 ${provider.data?.items.length ?? 0} 条日程',
+                              style: TextStyle(
+                                fontSize: AppFontSize.bodySmall,
+                                color: Theme.of(context).colorScheme.outline,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: IconButton(
+                              padding: EdgeInsets.zero,
+                              iconSize: 18,
+                              icon: Icon(
+                                _showSearchFilter
+                                    ? Icons.search_off_outlined
+                                    : Icons.search_outlined,
+                              ),
+                              tooltip: _showSearchFilter ? '收起筛选' : '搜索与筛选',
+                              onPressed: () {
+                                setState(() {
+                                  _showSearchFilter = !_showSearchFilter;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            Expanded(
+              child: Consumer<EventsListProvider>(
+                builder: (context, provider, _) => AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildBody(context, provider),
                 ),
               ),
-              Expanded(child: _buildBody(context, provider)),
-            ],
-          ),
+            ),
+          ],
         ),
-        floatingActionButton: widget.showAppBar
-            ? FloatingActionButton(
-                onPressed: () => _handleCreateSchedule(context, provider),
-                tooltip: '创建日程',
-                child: const Icon(Icons.add),
-              )
-            : null,
       ),
+      floatingActionButton: widget.showAppBar
+          ? Consumer<EventsListProvider>(
+              builder: (context, provider, _) {
+                return FloatingActionButton(
+                  onPressed: () => _handleCreateSchedule(context, provider),
+                  tooltip: '创建日程',
+                  child: const Icon(Icons.add),
+                );
+              },
+            )
+          : null,
     );
-  }
-
-  DateTime _normalizeDate(DateTime value) {
-    return DateTime(value.year, value.month, value.day);
   }
 
   DateTime _resolveSelectedDate(DateTime value) {
     final now = DateTime.now();
-    if (_normalizeDate(value) == _normalizeDate(now)) {
+    final normalizedValue = DateTime(value.year, value.month, value.day);
+    final normalizedNow = DateTime(now.year, now.month, now.day);
+    if (normalizedValue == normalizedNow) {
       return now;
     }
-    return _normalizeDate(value);
+    return normalizedValue;
   }
 }

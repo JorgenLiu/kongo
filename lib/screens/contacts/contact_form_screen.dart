@@ -13,10 +13,12 @@ import 'contact_form_actions.dart';
 
 class ContactFormScreen extends StatefulWidget {
   final Contact? initialContact;
+  final String? initialName;
 
   const ContactFormScreen({
     super.key,
     this.initialContact,
+    this.initialName,
   });
 
   bool get isEditing => initialContact != null;
@@ -37,16 +39,22 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
   bool _loadedInitialTags = false;
   bool _isSaving = false;
   bool _allowPop = false;
+  bool _cachedHasUnsavedChanges = false;
 
   @override
   void initState() {
     super.initState();
     final initialContact = widget.initialContact;
-    _nameController = TextEditingController(text: initialContact?.name ?? '');
+    _nameController = TextEditingController(text: initialContact?.name ?? widget.initialName ?? '');
     _phoneController = TextEditingController(text: initialContact?.phone ?? '');
     _emailController = TextEditingController(text: initialContact?.email ?? '');
     _addressController = TextEditingController(text: initialContact?.address ?? '');
     _notesController = TextEditingController(text: initialContact?.notes ?? '');
+    _nameController.addListener(_onFormChanged);
+    _phoneController.addListener(_onFormChanged);
+    _emailController.addListener(_onFormChanged);
+    _addressController.addListener(_onFormChanged);
+    _notesController.addListener(_onFormChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeTags();
     });
@@ -66,22 +74,31 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
   Widget build(BuildContext context) {
     final title = widget.isEditing ? '编辑联系人' : '新建联系人';
 
-    // ignore: deprecated_member_use
-    return WillPopScope(
-      onWillPop: () async {
-        if (_allowPop || !_hasUnsavedChanges) {
-          return true;
-        }
-
-        return showDiscardChangesDialog(context);
-      },
+    return PopScope(
+      canPop: _allowPop || !_hasUnsavedChanges,
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              if (_allowPop || !_hasUnsavedChanges) {
+                Navigator.of(context).pop();
+                return;
+              }
+              final shouldDiscard = await showDiscardChangesDialog(context);
+              if (shouldDiscard && context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
           title: Text(title),
           actions: [
-            TextButton(
-              onPressed: _isSaving ? null : _submit,
-              child: const Text('保存'),
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: FilledButton.tonal(
+                onPressed: _isSaving ? null : _submit,
+                child: const Text('保存'),
+              ),
             ),
           ],
         ),
@@ -273,6 +290,15 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
     });
   }
 
+  void _onFormChanged() {
+    final current = _hasUnsavedChanges;
+    if (current != _cachedHasUnsavedChanges) {
+      setState(() {
+        _cachedHasUnsavedChanges = current;
+      });
+    }
+  }
+
   String? _normalize(String value) {
     final normalized = value.trim();
     if (normalized.isEmpty) {
@@ -283,7 +309,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
 
   bool get _hasUnsavedChanges {
     final initialContact = widget.initialContact;
-    if (_normalize(_nameController.text) != (initialContact?.name)) {
+    if (_normalize(_nameController.text) != (initialContact?.name ?? _normalize(widget.initialName ?? ''))) {
       return true;
     }
     if (_normalize(_phoneController.text) != initialContact?.phone) {

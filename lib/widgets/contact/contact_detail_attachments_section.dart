@@ -17,7 +17,10 @@ class ContactDetailAttachmentsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
+      icon: Icons.attach_file_outlined,
       title: '相关附件',
+      collapsible: true,
+      initiallyExpanded: false,
       trailing: TextButton(
         onPressed: onOpenModule,
         child: const Text('进入模块'),

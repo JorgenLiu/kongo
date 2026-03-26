@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
 import '../../models/event_summary.dart';
+import 'summary_markdown_content.dart';
 
 class DailySummaryList extends StatelessWidget {
   final List<DailySummary> summaries;
   final ValueChanged<DailySummary>? onTap;
   final ValueChanged<DailySummary>? onEdit;
   final ValueChanged<DailySummary>? onDelete;
+  final ValueChanged<DailySummary>? onManageAttachments;
 
   const DailySummaryList({
     super.key,
@@ -15,6 +17,7 @@ class DailySummaryList extends StatelessWidget {
     this.onTap,
     this.onEdit,
     this.onDelete,
+    this.onManageAttachments,
   });
 
   @override
@@ -38,6 +41,9 @@ class DailySummaryList extends StatelessWidget {
                 onTap: onTap == null ? null : () => onTap!(summary),
                 onEdit: onEdit == null ? null : () => onEdit!(summary),
                 onDelete: onDelete == null ? null : () => onDelete!(summary),
+                onManageAttachments: onManageAttachments == null
+                    ? null
+                    : () => onManageAttachments!(summary),
               ),
             ),
           )
@@ -46,35 +52,53 @@ class DailySummaryList extends StatelessWidget {
   }
 }
 
-class _DailySummaryCard extends StatelessWidget {
+class _DailySummaryCard extends StatefulWidget {
   final DailySummary summary;
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onManageAttachments;
 
   const _DailySummaryCard({
     required this.summary,
     this.onTap,
     this.onEdit,
     this.onDelete,
+    this.onManageAttachments,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+  State<_DailySummaryCard> createState() => _DailySummaryCardState();
+}
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadius.lg),
-      child: Ink(
+class _DailySummaryCardState extends State<_DailySummaryCard> {
+  bool _hovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = widget.summary;
+    final hasContextMenuActions = widget.onEdit != null || widget.onDelete != null || widget.onManageAttachments != null;
+
+    return Semantics(
+      label: '总结 ${summary.summaryDate.year}年${summary.summaryDate.month}月${summary.summaryDate.day}日',
+      button: true,
+      child: MouseRegion(
+      onEnter: (_) => setState(() => _hovering = true),
+      onExit: (_) => setState(() => _hovering = false),
+      child: GestureDetector(
+      onSecondaryTapDown: hasContextMenuActions
+          ? (details) => _showContextMenu(context, details.globalPosition)
+          : null,
+      child: AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOutCubic,
+      child: Card(
+      elevation: _hovering ? 2 : null,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+      onTap: widget.onTap,
+      child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: colorScheme.outline.withValues(alpha: 0.2),
-          ),
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -88,25 +112,34 @@ class _DailySummaryCard extends StatelessWidget {
                         ),
                   ),
                 ),
-                if (onEdit != null || onDelete != null)
+                if (widget.onEdit != null || widget.onDelete != null || widget.onManageAttachments != null)
                   PopupMenuButton<_SummaryMenuAction>(
                     onSelected: (action) {
                       switch (action) {
+                        case _SummaryMenuAction.attachments:
+                          widget.onManageAttachments?.call();
                         case _SummaryMenuAction.edit:
-                          onEdit?.call();
+                          widget.onEdit?.call();
                         case _SummaryMenuAction.delete:
-                          onDelete?.call();
+                          widget.onDelete?.call();
                       }
                     },
-                    itemBuilder: (context) => const [
-                      PopupMenuItem<_SummaryMenuAction>(
-                        value: _SummaryMenuAction.edit,
-                        child: Text('编辑'),
-                      ),
-                      PopupMenuItem<_SummaryMenuAction>(
-                        value: _SummaryMenuAction.delete,
-                        child: Text('删除'),
-                      ),
+                    itemBuilder: (context) => [
+                      if (widget.onManageAttachments != null)
+                        const PopupMenuItem<_SummaryMenuAction>(
+                          value: _SummaryMenuAction.attachments,
+                          child: Text('附件'),
+                        ),
+                      if (widget.onEdit != null)
+                        const PopupMenuItem<_SummaryMenuAction>(
+                          value: _SummaryMenuAction.edit,
+                          child: Text('编辑'),
+                        ),
+                      if (widget.onDelete != null)
+                        const PopupMenuItem<_SummaryMenuAction>(
+                          value: _SummaryMenuAction.delete,
+                          child: Text('删除'),
+                        ),
                     ],
                   ),
               ],
@@ -124,7 +157,59 @@ class _DailySummaryCard extends StatelessWidget {
           ],
         ),
       ),
+    ),
+    ),
+    ),
+    ),
+    ),
     );
+  }
+
+  void _showContextMenu(BuildContext context, Offset position) {
+    final colorScheme = Theme.of(context).colorScheme;
+    showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx, position.dy),
+      items: [
+        if (widget.onManageAttachments != null)
+          PopupMenuItem(
+            value: 'attachments',
+            child: Row(
+              children: [
+                Icon(Icons.attach_file_outlined, size: 18, color: colorScheme.onSurface),
+                const SizedBox(width: AppSpacing.sm),
+                const Text('附件'),
+              ],
+            ),
+          ),
+        if (widget.onEdit != null)
+          PopupMenuItem(
+            value: 'edit',
+            child: Row(
+              children: [
+                Icon(Icons.edit_outlined, size: 18, color: colorScheme.onSurface),
+                const SizedBox(width: AppSpacing.sm),
+                const Text('编辑'),
+              ],
+            ),
+          ),
+        if (widget.onDelete != null)
+          PopupMenuItem(
+            value: 'delete',
+            child: Row(
+              children: [
+                Icon(Icons.delete_outline, size: 18, color: colorScheme.error),
+                const SizedBox(width: AppSpacing.sm),
+                Text('删除', style: TextStyle(color: colorScheme.error)),
+              ],
+            ),
+          ),
+      ],
+    ).then((value) {
+      if (value == 'attachments') widget.onManageAttachments?.call();
+      if (value == 'edit') widget.onEdit?.call();
+      if (value == 'delete') widget.onDelete?.call();
+    });
   }
 }
 
@@ -140,7 +225,6 @@ class _SummaryBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final displayContent = content.trim().isEmpty ? '未填写' : content.trim();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,17 +237,13 @@ class _SummaryBlock extends StatelessWidget {
               ),
         ),
         const SizedBox(height: AppSpacing.xs),
-        Text(
-          displayContent,
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface,
-              ),
+        SummaryMarkdownContent(
+          content: content,
+          selectable: false,
         ),
       ],
     );
   }
 }
 
-enum _SummaryMenuAction { edit, delete }
+enum _SummaryMenuAction { attachments, edit, delete }

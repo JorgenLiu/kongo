@@ -4,26 +4,31 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_constants.dart';
 import '../../models/event.dart';
-import '../../models/event_draft.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/tag_provider.dart';
 import '../../utils/unsaved_changes_guard.dart';
 import '../../utils/event_participant_roles.dart';
+import '../../utils/text_normalize.dart';
 import '../../widgets/common/error_state.dart';
 import '../../widgets/event/event_form_basic_section.dart';
 import '../../widgets/event/event_form_participants_section.dart';
 import '../../widgets/event/event_form_schedule_section.dart';
+import 'event_form_actions.dart';
 
 class EventFormScreen extends StatefulWidget {
   final Event? initialEvent;
   final Map<String, String> initialParticipantRoles;
   final String? suggestedContactId;
+  final String? initialTitle;
+  final DateTime? initialStartAt;
 
   const EventFormScreen({
     super.key,
     this.initialEvent,
     this.initialParticipantRoles = const {},
     this.suggestedContactId,
+    this.initialTitle,
+    this.initialStartAt,
   });
 
   bool get isEditing => initialEvent != null;
@@ -46,14 +51,18 @@ class _EventFormScreenState extends State<EventFormScreen> {
   String? _participantErrorText;
   bool _isSaving = false;
   bool _allowPop = false;
+  bool _cachedHasUnsavedChanges = false;
 
   @override
   void initState() {
     super.initState();
     final initialEvent = widget.initialEvent;
-    _titleController = TextEditingController(text: initialEvent?.title ?? '');
+    _titleController = TextEditingController(text: initialEvent?.title ?? widget.initialTitle ?? '');
     _locationController = TextEditingController(text: initialEvent?.location ?? '');
     _descriptionController = TextEditingController(text: initialEvent?.description ?? '');
+    _titleController.addListener(_onFormChanged);
+    _locationController.addListener(_onFormChanged);
+    _descriptionController.addListener(_onFormChanged);
     _selectedEventTypeId = initialEvent?.eventTypeId;
     _selectedCreatedByContactId = initialEvent?.createdByContactId ?? widget.suggestedContactId;
     _selectedParticipantRoles = {
@@ -63,7 +72,7 @@ class _EventFormScreenState extends State<EventFormScreen> {
       if (widget.initialParticipantRoles.isEmpty && widget.suggestedContactId != null)
         widget.suggestedContactId!: EventParticipantRoles.participant,
     };
-    _startAt = initialEvent?.startAt;
+    _startAt = initialEvent?.startAt ?? widget.initialStartAt;
     _endAt = initialEvent?.endAt;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -83,22 +92,31 @@ class _EventFormScreenState extends State<EventFormScreen> {
   Widget build(BuildContext context) {
     final title = widget.isEditing ? '编辑事件' : '新建事件';
 
-    // ignore: deprecated_member_use
-    return WillPopScope(
-      onWillPop: () async {
-        if (_allowPop || !_hasUnsavedChanges) {
-          return true;
-        }
-
-        return showDiscardChangesDialog(context);
-      },
+    return PopScope(
+      canPop: _allowPop || !_hasUnsavedChanges,
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              if (_allowPop || !_hasUnsavedChanges) {
+                Navigator.of(context).pop();
+                return;
+              }
+              final shouldDiscard = await showDiscardChangesDialog(context);
+              if (shouldDiscard && context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
           title: Text(title),
           actions: [
-            TextButton(
-              onPressed: _isSaving ? null : _submit,
-              child: const Text('保存'),
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: FilledButton.tonal(
+                onPressed: _isSaving ? null : _submit,
+                child: const Text('保存'),
+              ),
             ),
           ],
         ),
@@ -239,62 +257,53 @@ class _EventFormScreenState extends State<EventFormScreen> {
 
   void _submit() {
     if (_isSaving) return;
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
 
-    if (_selectedParticipantRoles.isEmpty) {
-      setState(() {
-        _participantErrorText = '请至少选择一个参与人';
-      });
-      return;
-    }
+    final draft = validateAndBuildEventDraft(
+      formKey: _formKey,
+      scaffoldContext: context,
+      titleController: _titleController,
+      locationController: _locationController,
+      descriptionController: _descriptionController,
+      selectedEventTypeId: _selectedEventTypeId,
+      selectedCreatedByContactId: _selectedCreatedByContactId,
+      selectedParticipantRoles: _selectedParticipantRoles,
+      startAt: _startAt,
+      endAt: _endAt,
+      initialEvent: widget.initialEvent,
+      onParticipantError: (message) {
+        setState(() {
+          _participantErrorText = message;
+        });
+      },
+    );
 
-    if (_startAt != null && _endAt != null && _endAt!.isBefore(_startAt!)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('结束时间不能早于开始时间')),
-      );
-      return;
-    }
+    if (draft == null) return;
 
     setState(() {
       _isSaving = true;
       _allowPop = true;
     });
-    Navigator.of(context).pop(
-      EventDraft(
-        title: _titleController.text.trim(),
-        eventTypeId: _selectedEventTypeId,
-        startAt: _startAt,
-        endAt: _endAt,
-        location: _normalize(_locationController.text),
-        description: _normalize(_descriptionController.text),
-        reminderEnabled: widget.initialEvent?.reminderEnabled ?? false,
-        reminderAt: widget.initialEvent?.reminderAt,
-        createdByContactId: _selectedCreatedByContactId,
-        participantIds: _selectedParticipantRoles.keys.toList(),
-        participantRoles: _selectedParticipantRoles,
-      ),
-    );
+    Navigator.of(context).pop(draft);
   }
 
-  String? _normalize(String value) {
-    final normalized = value.trim();
-    if (normalized.isEmpty) {
-      return null;
+  void _onFormChanged() {
+    final current = _hasUnsavedChanges;
+    if (current != _cachedHasUnsavedChanges) {
+      setState(() {
+        _cachedHasUnsavedChanges = current;
+      });
     }
-    return normalized;
   }
 
   bool get _hasUnsavedChanges {
     final initialEvent = widget.initialEvent;
-    if (_titleController.text.trim() != (initialEvent?.title ?? '')) {
+    if (_titleController.text.trim() != (initialEvent?.title ?? widget.initialTitle ?? '')) {
       return true;
     }
-    if (_normalize(_locationController.text) != initialEvent?.location) {
+    if (normalizeOptionalText(_locationController.text) != initialEvent?.location) {
       return true;
     }
-    if (_normalize(_descriptionController.text) != initialEvent?.description) {
+    if (normalizeOptionalText(_descriptionController.text) != initialEvent?.description) {
       return true;
     }
     if (_selectedEventTypeId != initialEvent?.eventTypeId) {

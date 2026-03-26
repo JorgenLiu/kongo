@@ -9,17 +9,52 @@ Future<TagDraft?> showTagFormDialog(
   Tag? initialTag,
   Set<String> existingTagNames = const <String>{},
 }) async {
-  final controller = TextEditingController(text: initialTag?.name ?? '');
-  final formKey = GlobalKey<FormState>();
-
-  final result = await showDialog<TagDraft>(
+  return showDialog<TagDraft>(
     context: context,
-    builder: (context) => AlertDialog(
-      title: Text(initialTag == null ? '新建分组' : '编辑分组'),
+    builder: (context) => _TagFormDialog(
+      initialTag: initialTag,
+      existingTagNames: existingTagNames,
+    ),
+  );
+}
+
+class _TagFormDialog extends StatefulWidget {
+  final Tag? initialTag;
+  final Set<String> existingTagNames;
+
+  const _TagFormDialog({
+    required this.initialTag,
+    required this.existingTagNames,
+  });
+
+  @override
+  State<_TagFormDialog> createState() => _TagFormDialogState();
+}
+
+class _TagFormDialogState extends State<_TagFormDialog> {
+  late final TextEditingController _controller;
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialTag?.name ?? '');
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.initialTag == null ? '新建分组' : '编辑分组'),
       content: Form(
-        key: formKey,
+        key: _formKey,
         child: TextFormField(
-          controller: controller,
+          controller: _controller,
           autofocus: true,
           maxLength: FormFieldLimits.tagName,
           decoration: const InputDecoration(
@@ -37,20 +72,12 @@ Future<TagDraft?> showTagFormDialog(
             }
 
             final normalized = value!.trim();
-            if (existingTagNames.contains(normalized)) {
+            if (widget.existingTagNames.contains(normalized)) {
               return '分组名称不能重复';
             }
             return null;
           },
-          onFieldSubmitted: (_) {
-            if (!formKey.currentState!.validate()) {
-              return;
-            }
-
-            Navigator.of(context).pop(
-              TagDraft(name: controller.text.trim()),
-            );
-          },
+          onFieldSubmitted: (_) => _submit(),
         ),
       ),
       actions: [
@@ -59,23 +86,21 @@ Future<TagDraft?> showTagFormDialog(
           child: const Text('取消'),
         ),
         FilledButton(
-          onPressed: () {
-            if (!formKey.currentState!.validate()) {
-              return;
-            }
-
-            Navigator.of(context).pop(
-              TagDraft(name: controller.text.trim()),
-            );
-          },
+          onPressed: _submit,
           child: const Text('保存'),
         ),
       ],
-    ),
-  );
+    );
+  }
 
-  controller.dispose();
-  return result;
+  void _submit() {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+    Navigator.of(context).pop(
+      TagDraft(name: _controller.text.trim()),
+    );
+  }
 }
 
 Future<bool> showDeleteTagConfirmDialog(

@@ -1,9 +1,11 @@
 import '../../models/attachment.dart';
 import '../../models/attachment_link.dart';
 import '../../models/contact.dart';
+import '../../models/contact_milestone.dart';
 import '../../models/event.dart';
 import '../../models/tag.dart';
 import '../../repositories/attachment_repository.dart';
+import '../../repositories/contact_milestone_repository.dart';
 import '../../repositories/contact_repository.dart';
 import '../../repositories/event_repository.dart';
 import '../../repositories/tag_repository.dart';
@@ -18,12 +20,14 @@ class DefaultContactReadService implements ContactReadService {
   final TagRepository _tagRepository;
   final EventRepository _eventRepository;
   final AttachmentRepository _attachmentRepository;
+  final ContactMilestoneRepository _milestoneRepository;
 
   DefaultContactReadService(
     this._contactRepository,
     this._tagRepository,
     this._eventRepository,
     this._attachmentRepository,
+    this._milestoneRepository,
   );
 
   @override
@@ -32,12 +36,14 @@ class DefaultContactReadService implements ContactReadService {
     final tags = await _tagRepository.getTagsForContact(contactId);
     final events = await _eventRepository.getByContactId(contactId);
     final eventTypes = await _eventRepository.getEventTypes();
+    final milestones = await _milestoneRepository.getByContactId(contactId);
     final eventIds = events.map((event) => event.id).toList();
     final eventAttachmentsByEventId = await _attachmentRepository.getByOwners(
       AttachmentOwnerType.event,
       eventIds,
     );
     final eventTypeNames = buildEventTypeNames(eventTypes);
+    final eventTypeColors = buildEventTypeColors(eventTypes);
     final attachments = collectSortedEventAttachments(
       events: events,
       eventAttachmentsByEventId: eventAttachmentsByEventId,
@@ -49,6 +55,8 @@ class DefaultContactReadService implements ContactReadService {
       events: events,
       attachments: attachments,
       eventTypeNames: eventTypeNames,
+      eventTypeColors: eventTypeColors,
+      milestones: milestones,
     );
   }
 }
@@ -59,6 +67,8 @@ class ContactDetailReadModel {
   final List<Event> events;
   final List<Attachment> attachments;
   final Map<String, String> eventTypeNames;
+  final Map<String, String> eventTypeColors;
+  final List<ContactMilestone> milestones;
 
   const ContactDetailReadModel({
     required this.contact,
@@ -66,5 +76,7 @@ class ContactDetailReadModel {
     required this.events,
     required this.attachments,
     required this.eventTypeNames,
+    this.eventTypeColors = const {},
+    this.milestones = const [],
   });
 }

@@ -12,6 +12,7 @@ import '../repositories/attachment_repository.dart';
 import '../repositories/contact_repository.dart';
 import '../repositories/event_repository.dart';
 import '../utils/event_participant_roles.dart';
+import '../utils/text_normalize.dart';
 
 abstract class EventService {
   Future<List<EventType>> getEventTypes();
@@ -66,8 +67,8 @@ class DefaultEventService implements EventService {
     final eventType = EventType(
       id: _uuid.v4(),
       name: normalizedName,
-      icon: _normalizeOptionalText(draft.icon),
-      color: _normalizeOptionalText(draft.color),
+      icon: normalizeOptionalText(draft.icon),
+      color: normalizeOptionalText(draft.color),
       createdAt: now,
       updatedAt: now,
     );
@@ -113,8 +114,8 @@ class DefaultEventService implements EventService {
       eventTypeId: draft.eventTypeId,
       startAt: draft.startAt,
       endAt: draft.endAt,
-      location: _normalizeOptionalText(draft.location),
-      description: _normalizeOptionalText(draft.description),
+      location: normalizeOptionalText(draft.location),
+      description: normalizeOptionalText(draft.description),
       reminderEnabled: draft.reminderEnabled,
       reminderAt: draft.reminderAt,
       createdByContactId: draft.createdByContactId,
@@ -146,8 +147,8 @@ class DefaultEventService implements EventService {
     return _eventRepository.update(
       event.copyWith(
         title: normalizedTitle,
-        location: _normalizeOptionalText(event.location),
-        description: _normalizeOptionalText(event.description),
+        location: normalizeOptionalText(event.location),
+        description: normalizeOptionalText(event.description),
         updatedAt: DateTime.now(),
       ),
     );
@@ -204,7 +205,7 @@ class DefaultEventService implements EventService {
         id: '${eventId}_$contactId',
         eventId: eventId,
         contactId: contactId,
-        role: EventParticipantRoles.normalize(_normalizeOptionalText(role)),
+        role: EventParticipantRoles.normalize(normalizeOptionalText(role)),
         addedAt: DateTime.now(),
       ),
     );
@@ -310,11 +311,5 @@ class DefaultEventService implements EventService {
     }
   }
 
-  String? _normalizeOptionalText(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-    return normalized;
-  }
+
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
+import '../../models/calendar_time_node.dart';
 import '../../services/read/event_read_service.dart';
 import 'monthly_event_calendar.dart';
 import 'schedule_week_calendar.dart';
@@ -9,6 +10,7 @@ enum ScheduleCalendarMode { week, month }
 
 class ScheduleOverviewHeader extends StatelessWidget {
   final List<EventListItemReadModel> items;
+  final List<CalendarTimeNodeReadModel> calendarTimeNodes;
   final ScheduleCalendarMode calendarMode;
   final DateTime? selectedDate;
   final ValueChanged<DateTime?> onDateSelected;
@@ -18,6 +20,7 @@ class ScheduleOverviewHeader extends StatelessWidget {
   const ScheduleOverviewHeader({
     super.key,
     required this.items,
+    this.calendarTimeNodes = const [],
     required this.calendarMode,
     required this.selectedDate,
     required this.onDateSelected,
@@ -72,6 +75,7 @@ class ScheduleOverviewHeader extends StatelessWidget {
           ? ScheduleWeekCalendar(
               key: const ValueKey('schedule-calendar-week'),
               items: items,
+              calendarTimeNodes: calendarTimeNodes,
               selectedDate: selectedDate,
               referenceDate: referenceDate,
               onDateSelected: onDateSelected,
@@ -80,6 +84,7 @@ class ScheduleOverviewHeader extends StatelessWidget {
           : MonthlyEventCalendar(
               key: const ValueKey('schedule-calendar-month'),
               events: items.map((item) => item.event).toList(),
+              calendarTimeNodes: calendarTimeNodes,
               selectedDate: selectedDate,
               onDateSelected: onDateSelected,
               showFrame: false,

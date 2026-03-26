@@ -1,12 +1,16 @@
 import '../../models/attachment.dart';
 import '../../models/attachment_link.dart';
+import '../../models/calendar_time_node.dart';
 import '../../models/contact.dart';
 import '../../models/event.dart';
 import '../../models/event_participant.dart';
 import '../../repositories/attachment_repository.dart';
 import '../../repositories/contact_repository.dart';
 import '../../repositories/event_repository.dart';
+import '../calendar_time_node_settings_service.dart';
+import '../contact_milestone_service.dart';
 import '../../utils/event_participant_roles.dart';
+import 'calendar_time_node_catalog.dart';
 import 'read_aggregation_helpers.dart';
 
 abstract class EventReadService {
@@ -23,11 +27,15 @@ class DefaultEventReadService implements EventReadService {
   final ContactRepository _contactRepository;
   final EventRepository _eventRepository;
   final AttachmentRepository _attachmentRepository;
+  final ContactMilestoneService _contactMilestoneService;
+  final CalendarTimeNodeSettingsService _calendarTimeNodeSettingsService;
 
   DefaultEventReadService(
     this._contactRepository,
     this._eventRepository,
     this._attachmentRepository,
+    this._contactMilestoneService,
+    this._calendarTimeNodeSettingsService,
   );
 
   @override
@@ -75,8 +83,9 @@ class DefaultEventReadService implements EventReadService {
     required Contact? contact,
     required List<Event> events,
   }) async {
-
-    final eventTypeNames = buildEventTypeNames(await _eventRepository.getEventTypes());
+    final eventTypes = await _eventRepository.getEventTypes();
+    final eventTypeNames = buildEventTypeNames(eventTypes);
+    final eventTypeColors = buildEventTypeColors(eventTypes);
     final participantsByEventId = await _eventRepository.getParticipantsByEventIds(
       events.map((event) => event.id).toList(),
     );
@@ -86,6 +95,7 @@ class DefaultEventReadService implements EventReadService {
           (event) => EventListItemReadModel(
             event: event,
             eventTypeName: eventTypeNames[event.eventTypeId],
+            eventTypeColor: eventTypeColors[event.eventTypeId],
             participantNames: (participantsByEventId[event.id] ?? const <Contact>[])
                 .map((item) => item.name)
                 .toList(),
@@ -93,10 +103,75 @@ class DefaultEventReadService implements EventReadService {
         )
         .toList();
 
+    final calendarTimeNodes = await _loadCalendarTimeNodes();
+
     return EventsListReadModel(
       contact: contact,
       items: items,
+      calendarTimeNodes: calendarTimeNodes,
     );
+  }
+
+  Future<List<CalendarTimeNodeReadModel>> _loadCalendarTimeNodes() async {
+    final settings = await _calendarTimeNodeSettingsService.getSettings();
+    final nodes = <CalendarTimeNodeReadModel>[];
+
+    if (settings.contactMilestonesEnabled) {
+      final rawMilestones = await _contactMilestoneService.getAllMilestones();
+      final milestoneContactIds = rawMilestones.map((item) => item.contactId).toSet().toList();
+      final contactsById = <String, Contact>{};
+      for (final contactId in milestoneContactIds) {
+        try {
+          contactsById[contactId] = await _contactRepository.getById(contactId);
+        } catch (_) {
+          // 联系人可能已被删除，跳过孤立里程碑
+        }
+      }
+
+      nodes.addAll(
+        rawMilestones
+            .where((item) => contactsById.containsKey(item.contactId))
+            .map(
+              (item) => CalendarTimeNodeReadModel.contactMilestone(
+                contact: contactsById[item.contactId]!,
+                milestone: item,
+              ),
+            ),
+      );
+    }
+
+    if (settings.publicHolidaysEnabled) {
+      nodes.addAll(buildPublicHolidayCalendarNodes());
+    }
+
+    if (settings.marketingCampaignsEnabled) {
+      nodes.addAll(buildMarketingCampaignCalendarNodes());
+    }
+
+    nodes.sort(_compareCalendarTimeNodes);
+    return nodes;
+  }
+
+  int _compareCalendarTimeNodes(
+    CalendarTimeNodeReadModel left,
+    CalendarTimeNodeReadModel right,
+  ) {
+    final monthCompare = left.anchorDate.month.compareTo(right.anchorDate.month);
+    if (monthCompare != 0) {
+      return monthCompare;
+    }
+
+    final dayCompare = left.anchorDate.day.compareTo(right.anchorDate.day);
+    if (dayCompare != 0) {
+      return dayCompare;
+    }
+
+    final kindCompare = left.kind.index.compareTo(right.kind.index);
+    if (kindCompare != 0) {
+      return kindCompare;
+    }
+
+    return left.title.compareTo(right.title);
   }
 
   @override
@@ -164,21 +239,25 @@ class DefaultEventReadService implements EventReadService {
 class EventsListReadModel {
   final Contact? contact;
   final List<EventListItemReadModel> items;
+  final List<CalendarTimeNodeReadModel> calendarTimeNodes;
 
   const EventsListReadModel({
     required this.contact,
     required this.items,
+    this.calendarTimeNodes = const [],
   });
 }
 
 class EventListItemReadModel {
   final Event event;
   final String? eventTypeName;
+  final String? eventTypeColor;
   final List<String> participantNames;
 
   const EventListItemReadModel({
     required this.event,
     required this.eventTypeName,
+    this.eventTypeColor,
     required this.participantNames,
   });
 }

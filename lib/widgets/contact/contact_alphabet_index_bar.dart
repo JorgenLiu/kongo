@@ -37,9 +37,10 @@ class ContactAlphabetIndexBar extends StatelessWidget {
 
         return Container(
           width: 32,
+          margin: const EdgeInsets.only(left: AppSpacing.sm),
           padding: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerLow,
+            color: colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(AppRadius.lg),
           ),
           child: Column(

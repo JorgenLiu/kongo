@@ -17,6 +17,7 @@ class ContactDetailTagsSection extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return SectionCard(
+      icon: Icons.label_outlined,
       title: '分组',
       child: tags.isEmpty
           ? Text(

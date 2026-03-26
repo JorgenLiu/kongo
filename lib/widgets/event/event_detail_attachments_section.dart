@@ -23,7 +23,10 @@ class EventDetailAttachmentsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
+      icon: Icons.attach_file_outlined,
       title: '事件附件',
+      collapsible: true,
+      initiallyExpanded: false,
       trailing: onAddAttachment == null
           ? null
           : TextButton.icon(

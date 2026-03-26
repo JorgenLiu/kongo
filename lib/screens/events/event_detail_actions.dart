@@ -11,6 +11,7 @@ import '../../providers/event_provider.dart';
 import '../../utils/attachment_action_helpers.dart';
 import '../../utils/contact_action_helpers.dart';
 import '../../utils/event_action_helpers.dart';
+import '../../config/page_transitions.dart';
 import '../../utils/navigation_helpers.dart';
 import '../contacts/contact_detail_screen.dart';
 import 'event_form_screen.dart';
@@ -29,7 +30,7 @@ Future<void> editEventDetail(
   required Map<String, String> participantRoles,
 }) async {
   final draft = await Navigator.of(context).push<EventDraft>(
-    MaterialPageRoute(
+    SlidePageRoute(
       builder: (_) => EventFormScreen(
         initialEvent: event,
         initialParticipantRoles: participantRoles,
@@ -116,16 +117,19 @@ Future<void> addEventAttachment(
   BuildContext context, {
   required Event event,
 }) async {
-  final sourcePath = await pickAttachmentSourcePath();
-  if (sourcePath == null || !context.mounted) {
+  final importSelection = await pickAttachmentImportSelection(context);
+  if (importSelection == null || !context.mounted) {
     return;
   }
 
   final provider = context.read<AttachmentProvider>();
   await provider.addAttachmentFromPath(
-    sourcePath,
+    importSelection.sourcePath,
     ownerType: AttachmentOwnerType.event,
     ownerId: event.id,
+    preferredStorageMode: importSelection.preferredStorageMode,
+    importPolicy: importSelection.importPolicy,
+    allowLargeFile: importSelection.allowLargeFile,
   );
 
   if (!context.mounted) {

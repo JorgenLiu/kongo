@@ -39,7 +39,7 @@ class ContactHeaderTagsBar extends StatelessWidget {
         runSpacing: AppSpacing.sm,
         children: [
           ...visibleTags.map((tag) {
-            return ChoiceChip(
+            return FilterChip(
               key: Key('contactsHeaderTag_${tag.id}'),
               label: Text(tag.name),
               selected: selectedTagIds.contains(tag.id),

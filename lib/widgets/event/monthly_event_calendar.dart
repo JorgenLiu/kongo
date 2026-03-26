@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
+import '../../models/calendar_time_node.dart';
 import '../../models/event.dart';
+import 'calendar_time_node_presentation.dart';
 
 class MonthlyEventCalendar extends StatefulWidget {
   final List<Event> events;
+  final List<CalendarTimeNodeReadModel> calendarTimeNodes;
   final DateTime? initialMonth;
   final DateTime? selectedDate;
   final ValueChanged<DateTime?>? onDateSelected;
@@ -15,6 +18,7 @@ class MonthlyEventCalendar extends StatefulWidget {
   const MonthlyEventCalendar({
     super.key,
     required this.events,
+    this.calendarTimeNodes = const [],
     this.initialMonth,
     this.selectedDate,
     this.onDateSelected,
@@ -55,6 +59,7 @@ class _MonthlyEventCalendarState extends State<MonthlyEventCalendar> {
     final monthEnd = DateTime(nextMonthStart.year, nextMonthStart.month, 0);
     final firstWeekdayOffset = monthStart.weekday - DateTime.monday;
     final countsByDateKey = _buildCountsByDateKey(monthStart);
+    final nodesByDateKey = _buildCalendarNodesByDateKey(monthStart, monthEnd);
     final dayCells = <Widget>[];
 
     for (var index = 0; index < firstWeekdayOffset; index++) {
@@ -64,6 +69,7 @@ class _MonthlyEventCalendarState extends State<MonthlyEventCalendar> {
     for (var day = 1; day <= monthEnd.day; day++) {
       final date = DateTime(monthStart.year, monthStart.month, day);
       final eventCount = countsByDateKey[_dateKey(date)] ?? 0;
+      final dayNodes = nodesByDateKey[_dateKey(date)] ?? const <CalendarTimeNodeReadModel>[];
       final isToday = _isSameDate(date, DateTime.now());
       final isSelected = _isSameDate(date, widget.selectedDate);
 
@@ -72,6 +78,7 @@ class _MonthlyEventCalendarState extends State<MonthlyEventCalendar> {
           key: Key('eventsMonthlyCalendar_day_$day'),
           day: day,
           eventCount: eventCount,
+          calendarNodes: dayNodes,
           compact: widget.compact,
           isToday: isToday,
           isSelected: isSelected,
@@ -265,6 +272,25 @@ class _MonthlyEventCalendarState extends State<MonthlyEventCalendar> {
     return result;
   }
 
+  Map<String, List<CalendarTimeNodeReadModel>> _buildCalendarNodesByDateKey(
+    DateTime monthStart,
+    DateTime monthEnd,
+  ) {
+    final result = <String, List<CalendarTimeNodeReadModel>>{};
+
+    for (final node in widget.calendarTimeNodes) {
+      for (var day = monthStart.day; day <= monthEnd.day; day++) {
+        final date = DateTime(monthStart.year, monthStart.month, day);
+        if (!node.occursOn(date)) {
+          continue;
+        }
+        result.putIfAbsent(_dateKey(date), () => <CalendarTimeNodeReadModel>[]).add(node);
+      }
+    }
+
+    return result;
+  }
+
   DateTime _normalizeMonth(DateTime value) {
     return DateTime(value.year, value.month);
   }
@@ -291,6 +317,7 @@ class _MonthlyEventCalendarState extends State<MonthlyEventCalendar> {
 class _CalendarDayCell extends StatelessWidget {
   final int day;
   final int eventCount;
+  final List<CalendarTimeNodeReadModel> calendarNodes;
   final bool compact;
   final bool isToday;
   final bool isSelected;
@@ -300,6 +327,7 @@ class _CalendarDayCell extends StatelessWidget {
     super.key,
     required this.day,
     required this.eventCount,
+    this.calendarNodes = const [],
     required this.compact,
     required this.isToday,
     required this.isSelected,
@@ -310,6 +338,10 @@ class _CalendarDayCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final hasEvents = eventCount > 0;
+    final hasCalendarNodes = calendarNodes.isNotEmpty;
+    final nodeStyle = hasCalendarNodes
+      ? resolveCalendarTimeNodeVisualStyle(context, calendarNodes.first.kind)
+      : null;
     final backgroundColor = isSelected
         ? colorScheme.primaryContainer
         : isToday
@@ -348,6 +380,34 @@ class _CalendarDayCell extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (hasCalendarNodes)
+                  Positioned(
+                    left: 2,
+                    top: 2,
+                    child: Tooltip(
+                      message: buildCalendarTimeNodeBadgeTooltip(calendarNodes),
+                      waitDuration: const Duration(milliseconds: 250),
+                      child: Container(
+                        key: Key('eventsMonthlyCalendar_nodeBadge_$day'),
+                        constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        decoration: BoxDecoration(
+                          color: nodeStyle!.backgroundColor,
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          buildCalendarTimeNodeBadgeLabel(calendarNodes),
+                          style: TextStyle(
+                            fontSize: compact ? 8 : 9,
+                            fontWeight: FontWeight.w700,
+                            color: nodeStyle.foregroundColor,
+                            height: 1.1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (hasEvents)
                   Positioned(
                     right: 2,

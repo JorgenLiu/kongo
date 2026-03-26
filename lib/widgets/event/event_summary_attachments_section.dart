@@ -29,6 +29,7 @@ class EventSummaryAttachmentsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
+      icon: Icons.attach_file_outlined,
       title: '总结附件',
       trailing: onAddAttachment == null
           ? null

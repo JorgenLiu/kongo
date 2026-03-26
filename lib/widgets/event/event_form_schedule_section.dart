@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../config/app_constants.dart';
 import '../../utils/display_formatters.dart';
-import '../../utils/form_input_validators.dart';
 
-class EventFormScheduleSection extends StatefulWidget {
+class EventFormScheduleSection extends StatelessWidget {
   final DateTime? startAt;
   final DateTime? endAt;
   final ValueChanged<DateTime?> onStartChanged;
@@ -20,87 +18,6 @@ class EventFormScheduleSection extends StatefulWidget {
   });
 
   @override
-  State<EventFormScheduleSection> createState() => _EventFormScheduleSectionState();
-}
-
-class _EventFormScheduleSectionState extends State<EventFormScheduleSection> {
-  late final TextEditingController _startTimeController;
-  late final TextEditingController _endTimeController;
-  String? _pendingStartText;
-  String? _pendingEndText;
-
-  @override
-  void initState() {
-    super.initState();
-    _startTimeController = TextEditingController(text: _formatTime(widget.startAt));
-    _endTimeController = TextEditingController(text: _formatTime(widget.endAt));
-  }
-
-  @override
-  void didUpdateWidget(covariant EventFormScheduleSection oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    final startText = _formatTime(widget.startAt);
-    if (_startTimeController.text != startText) {
-      _scheduleControllerSync(
-        controller: _startTimeController,
-        nextText: startText,
-        isStart: true,
-      );
-    }
-
-    final endText = _formatTime(widget.endAt);
-    if (_endTimeController.text != endText) {
-      _scheduleControllerSync(
-        controller: _endTimeController,
-        nextText: endText,
-        isStart: false,
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _startTimeController.dispose();
-    _endTimeController.dispose();
-    super.dispose();
-  }
-
-  void _scheduleControllerSync({
-    required TextEditingController controller,
-    required String nextText,
-    required bool isStart,
-  }) {
-    if (isStart) {
-      _pendingStartText = nextText;
-    } else {
-      _pendingEndText = nextText;
-    }
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-
-      final pendingText = isStart ? _pendingStartText : _pendingEndText;
-      if (pendingText != nextText || controller.text == nextText) {
-        return;
-      }
-
-      controller.value = controller.value.copyWith(
-        text: nextText,
-        selection: TextSelection.collapsed(offset: nextText.length),
-        composing: TextRange.empty,
-      );
-
-      if (isStart) {
-        _pendingStartText = null;
-      } else {
-        _pendingEndText = null;
-      }
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
@@ -112,22 +29,13 @@ class _EventFormScheduleSectionState extends State<EventFormScheduleSection> {
               '时间安排',
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              '保留日期选择，时间直接输入 24 小时制，避免再出现无意义的表盘。',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
             const SizedBox(height: AppSpacing.md),
             _DateTimeRow(
               label: '开始时间',
-              value: widget.startAt,
-              timeController: _startTimeController,
-              onDateTap: () => _pickDate(isStart: true),
-              onTimeChanged: (value) => _handleTimeChanged(value, isStart: true),
-              onClear: () {
-                _startTimeController.clear();
-                widget.onStartChanged(null);
-              },
+              value: startAt,
+              onDateTap: () => _pickDate(context, isStart: true),
+              onTimeTap: () => _pickTime(context, isStart: true),
+              onClear: () => onStartChanged(null),
               dateFieldKey: const Key('eventForm_startDateField'),
               timeFieldKey: const Key('eventForm_startTimeField'),
               clearButtonKey: const Key('eventForm_clearStartButton'),
@@ -135,14 +43,10 @@ class _EventFormScheduleSectionState extends State<EventFormScheduleSection> {
             const SizedBox(height: AppSpacing.md),
             _DateTimeRow(
               label: '结束时间',
-              value: widget.endAt,
-              timeController: _endTimeController,
-              onDateTap: () => _pickDate(isStart: false),
-              onTimeChanged: (value) => _handleTimeChanged(value, isStart: false),
-              onClear: () {
-                _endTimeController.clear();
-                widget.onEndChanged(null);
-              },
+              value: endAt,
+              onDateTap: () => _pickDate(context, isStart: false),
+              onTimeTap: () => _pickTime(context, isStart: false),
+              onClear: () => onEndChanged(null),
               dateFieldKey: const Key('eventForm_endDateField'),
               timeFieldKey: const Key('eventForm_endTimeField'),
               clearButtonKey: const Key('eventForm_clearEndButton'),
@@ -153,8 +57,8 @@ class _EventFormScheduleSectionState extends State<EventFormScheduleSection> {
     );
   }
 
-  Future<void> _pickDate({required bool isStart}) async {
-    final currentValue = isStart ? widget.startAt : widget.endAt;
+  Future<void> _pickDate(BuildContext context, {required bool isStart}) async {
+    final currentValue = isStart ? startAt : endAt;
     final initialValue = currentValue ?? DateTime.now();
     final pickedDate = await showDatePicker(
       context: context,
@@ -164,7 +68,7 @@ class _EventFormScheduleSectionState extends State<EventFormScheduleSection> {
       initialEntryMode: DatePickerEntryMode.calendarOnly,
     );
 
-    if (pickedDate == null || !mounted) {
+    if (pickedDate == null || !context.mounted) {
       return;
     }
 
@@ -177,75 +81,56 @@ class _EventFormScheduleSectionState extends State<EventFormScheduleSection> {
     );
 
     if (isStart) {
-      widget.onStartChanged(mergedValue);
+      onStartChanged(mergedValue);
     } else {
-      widget.onEndChanged(mergedValue);
+      onEndChanged(mergedValue);
     }
   }
 
-  void _handleTimeChanged(String rawValue, {required bool isStart}) {
-    final parsedTime = _parseTime(rawValue);
-    if (parsedTime == null) {
+  Future<void> _pickTime(BuildContext context, {required bool isStart}) async {
+    final currentValue = isStart ? startAt : endAt;
+    final initialTime = currentValue != null
+        ? TimeOfDay(hour: currentValue.hour, minute: currentValue.minute)
+        : const TimeOfDay(hour: 9, minute: 0);
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: initialTime,
+      initialEntryMode: TimePickerEntryMode.input,
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedTime == null || !context.mounted) {
       return;
     }
 
-    final currentValue = isStart ? widget.startAt : widget.endAt;
     final baseDate = currentValue ?? DateTime.now();
     final mergedValue = DateTime(
       baseDate.year,
       baseDate.month,
       baseDate.day,
-      parsedTime.$1,
-      parsedTime.$2,
+      pickedTime.hour,
+      pickedTime.minute,
     );
 
     if (isStart) {
-      widget.onStartChanged(mergedValue);
+      onStartChanged(mergedValue);
     } else {
-      widget.onEndChanged(mergedValue);
+      onEndChanged(mergedValue);
     }
-  }
-
-  (int, int)? _parseTime(String rawValue) {
-    final normalized = rawValue.trim();
-    if (normalized.isEmpty) {
-      return null;
-    }
-
-    final parts = normalized.split(':');
-    if (parts.length != 2) {
-      return null;
-    }
-
-    final hour = int.tryParse(parts[0]);
-    final minute = int.tryParse(parts[1]);
-    if (hour == null || minute == null) {
-      return null;
-    }
-    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-      return null;
-    }
-
-    return (hour, minute);
-  }
-
-  String _formatTime(DateTime? value) {
-    if (value == null) {
-      return '';
-    }
-
-    final hour = value.hour.toString().padLeft(2, '0');
-    final minute = value.minute.toString().padLeft(2, '0');
-    return '$hour:$minute';
   }
 }
 
 class _DateTimeRow extends StatelessWidget {
   final String label;
   final DateTime? value;
-  final TextEditingController timeController;
   final VoidCallback onDateTap;
-  final ValueChanged<String> onTimeChanged;
+  final VoidCallback onTimeTap;
   final VoidCallback onClear;
   final Key dateFieldKey;
   final Key timeFieldKey;
@@ -254,9 +139,8 @@ class _DateTimeRow extends StatelessWidget {
   const _DateTimeRow({
     required this.label,
     required this.value,
-    required this.timeController,
     required this.onDateTap,
-    required this.onTimeChanged,
+    required this.onTimeTap,
     required this.onClear,
     required this.dateFieldKey,
     required this.timeFieldKey,
@@ -265,6 +149,8 @@ class _DateTimeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final timeText = _formatTime(value);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -297,34 +183,50 @@ class _DateTimeRow extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.sm),
             SizedBox(
-              width: 120,
-              child: TextFormField(
+              width: 140,
+              child: InkWell(
                 key: timeFieldKey,
-                controller: timeController,
-                maxLength: 5,
-                keyboardType: TextInputType.datetime,
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp('[0-9:]')),
-                ],
-                onChanged: onTimeChanged,
-                validator: FormInputValidators.time,
-                decoration: const InputDecoration(
-                  labelText: '时间',
-                  hintText: '09:30',
+                onTap: onTimeTap,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: '时间',
+                    hintText: '选择时间',
+                    suffixIcon: Icon(Icons.access_time_outlined),
+                  ),
+                  child: Text(
+                    timeText.isEmpty ? '选择时间' : timeText,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: timeText.isEmpty
+                              ? Theme.of(context).hintColor
+                              : null,
+                        ),
+                  ),
                 ),
               ),
             ),
-            if (value != null) ...[
-              const SizedBox(width: AppSpacing.sm),
-              TextButton(
+            const SizedBox(width: AppSpacing.sm),
+            Visibility(
+              visible: value != null,
+              maintainSize: true,
+              maintainAnimation: true,
+              maintainState: true,
+              child: TextButton(
                 key: clearButtonKey,
-                onPressed: onClear,
+                onPressed: value != null ? onClear : null,
                 child: const Text('清除'),
               ),
-            ],
+            ),
           ],
         ),
       ],
     );
+  }
+
+  String _formatTime(DateTime? value) {
+    if (value == null) return '';
+    final hour = value.hour.toString().padLeft(2, '0');
+    final minute = value.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 }

@@ -15,6 +15,7 @@ class ContactDetailInfoSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SectionCard(
+      icon: Icons.phone_outlined,
       title: '联系信息',
       child: Column(
         children: [

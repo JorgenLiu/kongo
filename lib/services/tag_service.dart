@@ -5,6 +5,7 @@ import '../models/tag.dart';
 import '../models/tag_draft.dart';
 import '../repositories/contact_repository.dart';
 import '../repositories/tag_repository.dart';
+import '../utils/text_normalize.dart';
 
 abstract class TagService {
   Future<List<Tag>> getTags();
@@ -50,7 +51,7 @@ class DefaultTagService implements TagService {
     final tag = Tag(
       id: _uuid.v4(),
       name: normalizedName,
-      color: _normalizeOptionalText(draft.color),
+      color: normalizeOptionalText(draft.color),
       createdAt: now,
       updatedAt: now,
     );
@@ -69,7 +70,7 @@ class DefaultTagService implements TagService {
     return _tagRepository.update(
       tag.copyWith(
         name: normalizedName,
-        color: _normalizeOptionalText(tag.color),
+        color: normalizeOptionalText(tag.color),
         updatedAt: DateTime.now(),
       ),
     );
@@ -107,11 +108,5 @@ class DefaultTagService implements TagService {
     return _tagRepository.getContactCountByTag(tagId);
   }
 
-  String? _normalizeOptionalText(String? value) {
-    final normalized = value?.trim();
-    if (normalized == null || normalized.isEmpty) {
-      return null;
-    }
-    return normalized;
-  }
+
 }

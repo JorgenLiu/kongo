@@ -25,6 +25,7 @@ class EventDetailParticipantsSection extends StatelessWidget {
       ..sort((left, right) => EventParticipantRoles.sortIndexOf(left).compareTo(EventParticipantRoles.sortIndexOf(right)));
 
     return SectionCard(
+      icon: Icons.people_outlined,
       title: '参与人',
       child: participants.isEmpty
           ? Text(

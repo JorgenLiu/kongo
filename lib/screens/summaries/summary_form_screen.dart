@@ -5,6 +5,7 @@ import '../../models/event_summary.dart';
 import '../../models/event_summary_draft.dart';
 import '../../utils/form_input_validators.dart';
 import '../../utils/unsaved_changes_guard.dart';
+import '../../widgets/summary/summary_markdown_preview_card.dart';
 
 class SummaryFormScreen extends StatefulWidget {
   final DailySummary? initialSummary;
@@ -27,6 +28,7 @@ class _SummaryFormScreenState extends State<SummaryFormScreen> {
   late DateTime _selectedDate;
   bool _isSaving = false;
   bool _allowPop = false;
+  bool _cachedHasUnsavedChanges = false;
 
   @override
   void initState() {
@@ -38,6 +40,8 @@ class _SummaryFormScreenState extends State<SummaryFormScreen> {
     _tomorrowPlanController = TextEditingController(
       text: widget.initialSummary?.tomorrowPlan ?? '',
     );
+    _todaySummaryController.addListener(_onFormChanged);
+    _tomorrowPlanController.addListener(_onFormChanged);
   }
 
   @override
@@ -49,22 +53,31 @@ class _SummaryFormScreenState extends State<SummaryFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // ignore: deprecated_member_use
-    return WillPopScope(
-      onWillPop: () async {
-        if (_allowPop || !_hasUnsavedChanges) {
-          return true;
-        }
-
-        return showDiscardChangesDialog(context);
-      },
+    return PopScope(
+      canPop: _allowPop || !_hasUnsavedChanges,
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              if (_allowPop || !_hasUnsavedChanges) {
+                Navigator.of(context).pop();
+                return;
+              }
+              final shouldDiscard = await showDiscardChangesDialog(context);
+              if (shouldDiscard && context.mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+          ),
           title: Text(widget.isEditing ? '编辑总结' : '新建总结'),
           actions: [
-            TextButton(
-              onPressed: _isSaving ? null : _submit,
-              child: const Text('保存'),
+            Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.sm),
+              child: FilledButton.tonal(
+                onPressed: _isSaving ? null : _submit,
+                child: const Text('保存'),
+              ),
             ),
           ],
         ),
@@ -92,7 +105,7 @@ class _SummaryFormScreenState extends State<SummaryFormScreen> {
                         maxLength: FormFieldLimits.summaryBody,
                         decoration: const InputDecoration(
                           labelText: '当日总结',
-                          hintText: '记录今天完成了什么、有哪些判断和结论。',
+                          hintText: '记录今天完成了什么、有哪些判断和结论。支持 Markdown。',
                           alignLabelWithHint: true,
                         ),
                         maxLines: 8,
@@ -109,7 +122,7 @@ class _SummaryFormScreenState extends State<SummaryFormScreen> {
                         maxLength: FormFieldLimits.summaryBody,
                         decoration: const InputDecoration(
                           labelText: '明日计划',
-                          hintText: '记录明天的推进计划。支持 TODO: 或 - [ ] 形式。',
+                          hintText: '记录明天的推进计划。支持 Markdown、TODO: 或 - [ ] 形式。',
                           alignLabelWithHint: true,
                         ),
                         maxLines: 8,
@@ -128,6 +141,11 @@ class _SummaryFormScreenState extends State<SummaryFormScreen> {
                           }
                           return null;
                         },
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                      SummaryMarkdownPreviewCard(
+                        todaySummaryController: _todaySummaryController,
+                        tomorrowPlanController: _tomorrowPlanController,
                       ),
                       const SizedBox(height: AppSpacing.lg),
                       FilledButton(
@@ -188,6 +206,15 @@ class _SummaryFormScreenState extends State<SummaryFormScreen> {
 
   DateTime _normalizeDate(DateTime value) {
     return DateTime(value.year, value.month, value.day);
+  }
+
+  void _onFormChanged() {
+    final current = _hasUnsavedChanges;
+    if (current != _cachedHasUnsavedChanges) {
+      setState(() {
+        _cachedHasUnsavedChanges = current;
+      });
+    }
   }
 
   bool get _hasUnsavedChanges {
