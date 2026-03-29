@@ -22,6 +22,7 @@ abstract class EventRepository {
     String? eventTypeId,
   });
   Future<List<Event>> getUpcomingEvents({int days = 30});
+  Future<List<Event>> getEventsByDate(DateTime date);
   Future<List<Event>> getByContactId(String contactId);
   Future<List<Contact>> getParticipants(String eventId);
   Future<Map<String, List<Contact>>> getParticipantsByEventIds(List<String> eventIds);
@@ -187,6 +188,25 @@ class SqliteEventRepository implements EventRepository {
         DatabaseService.eventsTable,
         where: 'startAt IS NOT NULL AND startAt BETWEEN ? AND ?',
         whereArgs: [now, end],
+        orderBy: 'startAt ASC',
+      );
+      return rows.map(_toEvent).toList();
+    });
+  }
+
+  @override
+  @override
+  Future<List<Event>> getEventsByDate(DateTime date) async {
+    return _run<List<Event>>('获取指定日期事件失败', (db) async {
+      final dayStart = DateTime(date.year, date.month, date.day);
+      final dayEnd = dayStart.add(const Duration(days: 1));
+      final rows = await db.query(
+        DatabaseService.eventsTable,
+        where: 'startAt IS NOT NULL AND startAt >= ? AND startAt < ?',
+        whereArgs: [
+          dayStart.millisecondsSinceEpoch,
+          dayEnd.millisecondsSinceEpoch,
+        ],
         orderBy: 'startAt ASC',
       );
       return rows.map(_toEvent).toList();

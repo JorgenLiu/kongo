@@ -4,15 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
 import 'package:kongo/config/app_colors.dart';
+import 'package:kongo/config/ai_config_store.dart';
 import 'package:kongo/main.dart';
 import 'package:kongo/models/attachment.dart';
 import 'package:kongo/models/event.dart';
 import 'package:kongo/providers/contact_detail_provider.dart';
 import 'package:kongo/providers/calendar_time_node_settings_provider.dart';
 import 'package:kongo/providers/home_provider.dart';
+import 'package:kongo/providers/notes_provider.dart';
+import 'package:kongo/providers/reminder_settings_provider.dart';
 import 'package:kongo/providers/theme_notifier.dart';
 import 'package:kongo/screens/app_shell_screen.dart';
 import 'package:kongo/screens/settings/settings_overview_screen.dart';
+import 'package:kongo/services/ai_secret_store.dart';
 import 'package:kongo/widgets/contact/contact_card.dart';
 import 'package:kongo/widgets/event/attachment_list.dart';
 import 'package:kongo/widgets/event/monthly_event_calendar.dart';
@@ -89,6 +93,26 @@ Future<void> waitForHomeOverviewReady(WidgetTester tester) async {
   fail('Timed out waiting for home provider to settle');
 }
 
+Future<void> waitForNotesOverviewReady(WidgetTester tester) async {
+  final headerFinder = find.byKey(const Key('notesPageHeaderTitle'));
+  await pumpUntilFound(tester, headerFinder);
+  final context = tester.element(headerFinder);
+  final provider = Provider.of<NotesProvider>(context, listen: false);
+  for (var attempt = 0; attempt < 100; attempt++) {
+    if (!provider.loading) {
+      await tester.pump();
+      return;
+    }
+
+    await tester.runAsync(() async {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    });
+    await tester.pump();
+  }
+
+  fail('Timed out waiting for notes provider to settle');
+}
+
 Future<void> waitForContactDetailReady(WidgetTester tester) async {
   final titleFinder = find.text('联系人详情');
   await pumpUntilFound(tester, titleFinder);
@@ -134,25 +158,24 @@ void main() {
     expect(settingsProvider.loading, isA<bool>());
 
     expect(find.byKey(const Key('homePageHeaderTitle')), findsOneWidget);
-  expect(find.text('本周概况'), findsOneWidget);
-  expect(find.text('今日日程'), findsOneWidget);
-  expect(find.text('今天暂无安排'), findsOneWidget);
-  expect(find.text('新建事件'), findsOneWidget);
-  expect(find.text('新建联系人'), findsOneWidget);
-  expect(find.text('新总结'), findsNothing);
+    expect(find.text('本周概况'), findsOneWidget);
+    expect(find.text('今日日程'), findsOneWidget);
+    expect(find.text('今天暂无安排'), findsOneWidget);
+    expect(find.text('新建事件'), findsOneWidget);
+    expect(find.text('新建联系人'), findsOneWidget);
+    expect(find.text('新总结'), findsNothing);
     expect(find.text('主页'), findsNothing);
     expect(find.text('标签'), findsNothing);
 
-    await tester.tap(find.text('总结').last);
-    await pumpUntilFound(tester, find.byKey(const Key('summaryPageHeaderTitle')));
+    await tester.tap(find.text('记录').last);
+    await pumpUntilFound(tester, find.byKey(const Key('notesPageHeaderTitle')));
 
-    expect(find.byKey(const Key('summaryPageHeaderTitle')), findsOneWidget);
-    expect(find.text('新建总结'), findsOneWidget);
+    expect(find.byKey(const Key('notesPageHeaderTitle')), findsOneWidget);
+    expect(find.text('记录'), findsWidgets);
 
     await drainPendingDatabaseTimers(tester);
 
   });
-
   testWidgets('App shell exposes global search entry', (WidgetTester tester) async {
     await tester.pumpWidget(MyApp(dependencies: harness.dependencies));
     await waitForHomeOverviewReady(tester);
@@ -185,8 +208,13 @@ void main() {
               harness.dependencies.calendarTimeNodeSettingsService,
             ),
           ),
+          ChangeNotifierProvider(
+            create: (_) => ReminderSettingsProvider(harness.dependencies.reminderService),
+          ),
           ChangeNotifierProvider.value(value: harness.dependencies.contactProvider),
           ChangeNotifierProvider.value(value: harness.dependencies.tagProvider),
+          Provider<AiConfigStore>.value(value: harness.dependencies.aiConfigStore),
+          Provider<AiSecretStore>.value(value: harness.dependencies.aiSecretStore),
         ],
         child: MaterialApp(
           theme: ThemeData(useMaterial3: true),
@@ -290,7 +318,7 @@ void main() {
       await tester.enterText(find.byKey(const Key('contactForm_nameField')), '未保存联系人');
       await tester.pump();
 
-      await tester.tap(find.byIcon(Icons.summarize_outlined).last, warnIfMissed: false);
+      await tester.tap(find.byIcon(Icons.edit_note_outlined).last, warnIfMissed: false);
       await tester.pump();
       await pumpUntilFound(tester, find.text('放弃未保存内容？'));
 
@@ -302,13 +330,13 @@ void main() {
 
       expect(find.text('新建联系人'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.summarize_outlined).last, warnIfMissed: false);
+      await tester.tap(find.byIcon(Icons.edit_note_outlined).last, warnIfMissed: false);
       await tester.pump();
       await pumpUntilFound(tester, find.text('放弃未保存内容？'));
 
       await tester.tap(find.byKey(const Key('discardChanges_discardButton')).last);
       await tester.pump();
-      await pumpUntilFound(tester, find.byKey(const Key('summaryPageHeaderTitle')));
+      await waitForNotesOverviewReady(tester);
 
       await tester.tap(find.byIcon(Icons.contacts_outlined).last, warnIfMissed: false);
       await tester.pump();
@@ -316,6 +344,18 @@ void main() {
 
       expect(find.byKey(const Key('contactsPageHeaderTitle')), findsOneWidget);
       expect(find.byKey(const Key('contactForm_nameField')), findsNothing);
+
+      // The tab switch resets the notes navigator key, causing a fresh
+      // NotesOverviewScreen (and NotesProvider) to be built in the background.
+      // Alternate real-time waits with fake-time pumps so that the background
+      // DB query completes AND all sqflite_ffi completion callbacks are drained
+      // before we dispose the widget tree.
+      for (var i = 0; i < 10; i++) {
+        await tester.runAsync(() async {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        });
+        await tester.pump();
+      }
 
       await drainPendingDatabaseTimers(tester);
     } finally {

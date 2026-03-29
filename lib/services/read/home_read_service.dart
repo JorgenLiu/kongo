@@ -4,9 +4,12 @@ import '../../models/contact.dart';
 import '../../models/contact_milestone.dart';
 import '../../models/contact_upcoming_milestone.dart';
 import '../../models/event.dart';
+import '../../models/todo_item.dart';
 import '../../repositories/contact_repository.dart';
+import '../../repositories/quick_note_repository.dart';
+import '../../repositories/todo_group_repository.dart';
+import '../../repositories/todo_item_repository.dart';
 import '../contact_milestone_service.dart';
-import '../summary_service.dart';
 import 'event_read_service.dart';
 
 abstract class HomeReadService {
@@ -17,13 +20,17 @@ class DefaultHomeReadService implements HomeReadService {
   final EventReadService _eventReadService;
   final ContactRepository _contactRepository;
   final ContactMilestoneService _milestoneService;
-  final SummaryService _summaryService;
+  final TodoGroupRepository _todoGroupRepository;
+  final TodoItemRepository _todoItemRepository;
+  final QuickNoteRepository _quickNoteRepository;
 
   DefaultHomeReadService(
     this._eventReadService,
     this._contactRepository,
     this._milestoneService,
-    this._summaryService,
+    this._todoGroupRepository,
+    this._todoItemRepository,
+    this._quickNoteRepository,
   );
 
   @override
@@ -75,17 +82,25 @@ class DefaultHomeReadService implements HomeReadService {
         return dayDiff != 0 ? dayDiff : a.contact.name.compareTo(b.contact.name);
       });
 
-    // Today's summary → pending action items
-    final todaySummary = await _summaryService.getSummaryByDate(todayStart);
-    List<ActionItem> pendingActions = const [];
-    if (todaySummary != null) {
-      pendingActions =
-          await _summaryService.extractActionItemsFromSummary(todaySummary.id);
+    // 未完成的 Todo 事项 → pending action items
+    final pendingActions = <ActionItem>[];
+    final activeGroups = await _todoGroupRepository.getAll();
+    for (final group in activeGroups) {
+      final items = await _todoItemRepository.getByGroupId(group.id);
+      for (final item in items) {
+        if (item.status == TodoItemStatus.pending) {
+          pendingActions.add(ActionItem(title: item.title, dueAt: item.dueAt));
+        }
+      }
     }
 
     // Contact count
     final allContacts = await _contactRepository.getAll();
     final totalContacts = allContacts.length;
+
+    // 今日笔记数
+    final todayNotes = await _quickNoteRepository.findByDate(todayStart);
+    final todayNotesCount = todayNotes.length;
 
     return HomeReadModel(
       todayEvents: todayEvents
@@ -104,6 +119,7 @@ class DefaultHomeReadService implements HomeReadService {
       totalEvents: allItems.length,
       totalContacts: totalContacts,
       todayEventCount: todayEvents.length,
+      todayNotesCount: todayNotesCount,
     );
   }
 
@@ -134,6 +150,7 @@ class HomeReadModel {
   final int totalEvents;
   final int totalContacts;
   final int todayEventCount;
+  final int todayNotesCount;
 
   const HomeReadModel({
     required this.todayEvents,
@@ -144,6 +161,7 @@ class HomeReadModel {
     required this.totalEvents,
     required this.totalContacts,
     required this.todayEventCount,
+    this.todayNotesCount = 0,
   });
 }
 

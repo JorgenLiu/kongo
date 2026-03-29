@@ -2,6 +2,9 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
+  private var quickCaptureStatusItem: QuickCaptureStatusItem?
+  private var quickCaptureChannel: FlutterMethodChannel?
+
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     var windowFrame = self.frame
@@ -25,6 +28,11 @@ class MainFlutterWindow: NSWindow {
     }
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+
+    if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+      appDelegate.configureFlutterChannels(controller: flutterViewController)
+    }
+
     let windowChannel = FlutterMethodChannel(
       name: "kongo/window_chrome",
       binaryMessenger: flutterViewController.engine.binaryMessenger
@@ -49,6 +57,16 @@ class MainFlutterWindow: NSWindow {
       self?.applyWindowChrome(arguments)
       result(nil)
     }
+
+    // 快速记录菜单栏入口
+    quickCaptureChannel = FlutterMethodChannel(
+      name: "kongo/quickCapture",
+      binaryMessenger: flutterViewController.engine.binaryMessenger
+    )
+    let quickCaptureItem = QuickCaptureStatusItem()
+    quickCaptureItem.channel = quickCaptureChannel
+    quickCaptureItem.setup()
+    quickCaptureStatusItem = quickCaptureItem
 
     super.awakeFromNib()
   }

@@ -13,13 +13,14 @@ class DatabaseService {
   Database? _database;
 
   static const String defaultDatabaseFileName = 'kongo.db';
-  static const int databaseVersion = 8;
+  static const int databaseVersion = 10;
   static const String contactMilestonesTable = 'contact_milestones';
   static const String appPreferencesTable = 'app_preferences';
   static const String todoGroupsTable = 'todo_groups';
   static const String todoItemsTable = 'todo_items';
   static const String todoItemContactsTable = 'todo_item_contacts';
   static const String todoItemEventsTable = 'todo_item_events';
+  static const String quickNotesTable = 'quick_notes';
   final String _databaseFileName;
 
   static const String contactsTable = 'contacts';

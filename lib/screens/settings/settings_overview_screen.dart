@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../../config/app_constants.dart';
 import '../../widgets/common/workbench_page_header.dart';
 import '../../widgets/settings/about_section.dart';
+import '../../widgets/settings/ai_settings_section.dart';
 import '../../widgets/settings/appearance_section.dart';
 import '../../widgets/settings/calendar_time_node_section.dart';
 import '../../widgets/settings/data_section.dart';
+import '../../widgets/settings/reminder_settings_section.dart';
 import 'settings_overview_actions.dart';
 
 class SettingsOverviewScreen extends StatelessWidget {
@@ -29,7 +31,11 @@ class SettingsOverviewScreen extends StatelessWidget {
             const SizedBox(height: AppSpacing.sm),
             const AppearanceSection(),
             const SizedBox(height: AppSpacing.md),
+            const ReminderSettingsSection(),
+            const SizedBox(height: AppSpacing.md),
             const CalendarTimeNodeSection(),
+            const SizedBox(height: AppSpacing.md),
+            const AiSettingsSection(),
             const SizedBox(height: AppSpacing.xl),
             // ── 数据管理 ──
             _SectionHeader(icon: Icons.folder_outlined, label: '数据管理'),

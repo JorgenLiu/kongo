@@ -5,10 +5,12 @@ import '../models/contact.dart';
 import '../models/contact_draft.dart';
 import '../models/event.dart';
 import '../models/tag.dart';
+import '../repositories/contact_milestone_repository.dart';
 import '../repositories/contact_repository.dart';
 import '../utils/text_normalize.dart';
 import '../repositories/event_repository.dart';
 import '../repositories/tag_repository.dart';
+import 'reminder_service.dart';
 
 abstract class ContactService {
   Future<List<Contact>> getContacts();
@@ -26,14 +28,20 @@ class DefaultContactService implements ContactService {
   final ContactRepository _contactRepository;
   final TagRepository _tagRepository;
   final EventRepository _eventRepository;
+  final ContactMilestoneRepository _contactMilestoneRepository;
+  final ReminderService? _reminderService;
   final Uuid _uuid;
 
   DefaultContactService(
     this._contactRepository,
     this._tagRepository,
     this._eventRepository, {
+    required ContactMilestoneRepository contactMilestoneRepository,
+    ReminderService? reminderService,
     Uuid? uuid,
-  }) : _uuid = uuid ?? const Uuid();
+  })  : _contactMilestoneRepository = contactMilestoneRepository,
+        _reminderService = reminderService,
+        _uuid = uuid ?? const Uuid();
 
   @override
   Future<List<Contact>> getContacts() {
@@ -117,7 +125,17 @@ class DefaultContactService implements ContactService {
   @override
   Future<void> deleteContact(String id) async {
     await _contactRepository.getById(id);
+    final milestones = await _contactMilestoneRepository.getByContactId(id);
     await _contactRepository.delete(id);
+    await _syncReminderSafely(() async {
+      if (_reminderService == null) {
+        return;
+      }
+
+      for (final milestone in milestones) {
+        await _reminderService.removeMilestoneReminder(milestone.id);
+      }
+    });
   }
 
   @override
@@ -163,5 +181,11 @@ class DefaultContactService implements ContactService {
     for (final tagId in targetTagIdSet.difference(currentTagIds)) {
       await _tagRepository.addToContact(contactId, tagId);
     }
+  }
+
+  Future<void> _syncReminderSafely(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (_) {}
   }
 }

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../../config/app_constants.dart';
 import '../../models/contact_milestone.dart';
 import '../../models/contact_milestone_draft.dart';
+import '../../models/reminder_default_offset.dart';
+import '../../services/settings_preferences_store.dart';
 import '../../utils/display_formatters.dart';
 
 /// 添加/编辑重要日期对话框，返回 [ContactMilestoneDraft] 或 null（取消）。
@@ -33,6 +36,8 @@ class _MilestoneFormDialogState extends State<_MilestoneFormDialog> {
   late bool _isRecurring;
   late bool _reminderEnabled;
   late int _reminderDaysBefore;
+  bool _didLoadReminderDefaults = false;
+  bool _didManuallyEditReminder = false;
 
   bool get _isEditing => widget.existing != null;
 
@@ -47,6 +52,10 @@ class _MilestoneFormDialogState extends State<_MilestoneFormDialog> {
     _isRecurring = existing?.isRecurring ?? true;
     _reminderEnabled = existing?.reminderEnabled ?? false;
     _reminderDaysBefore = existing?.reminderDaysBefore ?? 1;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadReminderDefaults();
+    });
   }
 
   @override
@@ -137,7 +146,10 @@ class _MilestoneFormDialogState extends State<_MilestoneFormDialog> {
                 contentPadding: EdgeInsets.zero,
                 title: const Text('启用提醒'),
                 value: _reminderEnabled,
-                onChanged: (value) => setState(() => _reminderEnabled = value),
+                onChanged: (value) => setState(() {
+                  _didManuallyEditReminder = true;
+                  _reminderEnabled = value;
+                }),
               ),
 
               if (_reminderEnabled) ...[
@@ -145,17 +157,20 @@ class _MilestoneFormDialogState extends State<_MilestoneFormDialog> {
                 DropdownButtonFormField<int>(
                   initialValue: _reminderDaysBefore,
                   decoration: const InputDecoration(labelText: '提前提醒天数'),
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('当天')),
-                    DropdownMenuItem(value: 1, child: Text('提前 1 天')),
-                    DropdownMenuItem(value: 3, child: Text('提前 3 天')),
-                    DropdownMenuItem(value: 7, child: Text('提前 7 天')),
-                    DropdownMenuItem(value: 14, child: Text('提前 14 天')),
-                    DropdownMenuItem(value: 30, child: Text('提前 30 天')),
-                  ],
+                  items: kMilestoneReminderDayOptions
+                      .map(
+                        (option) => DropdownMenuItem(
+                          value: option.daysBefore,
+                          child: Text(option.label),
+                        ),
+                      )
+                      .toList(growable: false),
                   onChanged: (value) {
                     if (value != null) {
-                      setState(() => _reminderDaysBefore = value);
+                      setState(() {
+                        _didManuallyEditReminder = true;
+                        _reminderDaysBefore = value;
+                      });
                     }
                   },
                 ),
@@ -203,6 +218,25 @@ class _MilestoneFormDialogState extends State<_MilestoneFormDialog> {
     if (picked != null && mounted) {
       setState(() => _selectedDate = picked);
     }
+  }
+
+  Future<void> _loadReminderDefaults() async {
+    if (_isEditing || _didLoadReminderDefaults) {
+      return;
+    }
+
+    final settings = await context.read<SettingsPreferencesStore>().getReminderSettings();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (!_didManuallyEditReminder) {
+        _reminderEnabled = true;
+        _reminderDaysBefore = settings.milestoneDefaultReminderDaysBefore;
+      }
+      _didLoadReminderDefaults = true;
+    });
   }
 
   void _submit() {

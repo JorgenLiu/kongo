@@ -4,7 +4,7 @@
 
 - 数据库类型：SQLite
 - 数据库文件：`kongo.db`
-- 当前 schema 版本：8（v9 迁移待执行，将新增 `deletedAt` 软删除字段）
+- 当前 schema 版本：9（已为 8 张核心表加入 `deletedAt` 软删除字段，预埋云同步基础）
 - 持久化入口：`lib/services/database_service.dart`
 
 ## 设计原则

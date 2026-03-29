@@ -28,21 +28,14 @@ class TodoBoardProvider extends BaseProvider {
   TodoItemSort get itemSort => _itemSort;
   bool get selectionMode => _selectionMode;
   Set<String> get selectedItemIds => Set.unmodifiable(_selectedItemIds);
-  int get visibleItemCount => _flattenVisibleItems(_data?.selectedGroup?.rootItems ?? const []).length;
+  int get visibleItemCount => (_data?.selectedGroup?.rootItems ?? const []).length;
 
   Future<void> load({String? selectedGroupId}) async {
     if (selectedGroupId != null) {
       _selectedGroupId = selectedGroupId;
     }
     await execute(() async {
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: _selectedGroupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _selectedGroupId = _data?.selectedGroup?.group.id;
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -52,13 +45,7 @@ class TodoBoardProvider extends BaseProvider {
   Future<void> selectGroup(String groupId) async {
     await execute(() async {
       _selectedGroupId = groupId;
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: groupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -92,7 +79,7 @@ class TodoBoardProvider extends BaseProvider {
 
   void selectAllVisibleItems() {
     _selectionMode = true;
-    _selectedItemIds = _flattenVisibleItems(_data?.selectedGroup?.rootItems ?? const [])
+    _selectedItemIds = (_data?.selectedGroup?.rootItems ?? const [])
         .map((node) => node.item.id)
         .toSet();
     notifyListeners();
@@ -126,13 +113,7 @@ class TodoBoardProvider extends BaseProvider {
     await execute(() async {
       final group = await _todoService.createGroup(draft);
       _selectedGroupId = group.id;
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: _selectedGroupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -140,13 +121,7 @@ class TodoBoardProvider extends BaseProvider {
   Future<void> updateGroup(TodoGroup group) async {
     await execute(() async {
       await _todoService.updateGroup(group);
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: selectedGroupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -154,14 +129,7 @@ class TodoBoardProvider extends BaseProvider {
   Future<void> archiveGroup(String groupId) async {
     await execute(() async {
       await _todoService.archiveGroup(groupId);
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: selectedGroupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _selectedGroupId = _data?.selectedGroup?.group.id;
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -170,13 +138,7 @@ class TodoBoardProvider extends BaseProvider {
     await execute(() async {
       await _todoService.restoreGroup(groupId);
       _selectedGroupId = groupId;
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: groupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -187,13 +149,7 @@ class TodoBoardProvider extends BaseProvider {
       if (_selectedGroupId == groupId) {
         _selectedGroupId = null;
       }
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: _selectedGroupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _selectedGroupId = _data?.selectedGroup?.group.id;
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -202,12 +158,7 @@ class TodoBoardProvider extends BaseProvider {
     await execute(() async {
       await _todoService.createItem(groupId, draft);
       _selectedGroupId = groupId;
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: groupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -220,13 +171,7 @@ class TodoBoardProvider extends BaseProvider {
     await execute(() async {
       await _todoService.updateItem(item, contactIds: contactIds, eventIds: eventIds);
       _selectedGroupId = item.groupId;
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: item.groupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -239,13 +184,7 @@ class TodoBoardProvider extends BaseProvider {
 
     await execute(() async {
       await _todoService.deleteItem(itemId);
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: groupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -253,13 +192,8 @@ class TodoBoardProvider extends BaseProvider {
   Future<void> toggleItemCompleted(TodoItem item, bool completed) async {
     await execute(() async {
       await _todoService.setItemCompleted(item.id, completed);
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: item.groupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _syncSelectionWithVisibleItems();
+      _selectedGroupId = item.groupId;
+      await _reloadBoard();
       markInitialized();
     });
   }
@@ -273,12 +207,7 @@ class TodoBoardProvider extends BaseProvider {
 
     await execute(() async {
       await _todoService.deleteItems(selectedIds);
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: groupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
+      await _reloadBoard();
       _selectedItemIds = <String>{};
       _selectionMode = false;
       _syncSelectionWithVisibleItems();
@@ -295,23 +224,24 @@ class TodoBoardProvider extends BaseProvider {
 
     await execute(() async {
       await _todoService.setItemsCompleted(selectedIds, completed);
-      _data = await _todoReadService.loadBoard(
-        selectedGroupId: groupId,
-        groupVisibility: _groupVisibility,
-        itemFilter: _itemFilter,
-        itemSort: _itemSort,
-      );
-      _syncSelectionWithVisibleItems();
+      await _reloadBoard();
       markInitialized();
     });
   }
 
-  List<TodoItemTreeNodeReadModel> _flattenVisibleItems(List<TodoItemTreeNodeReadModel> nodes) {
-    return nodes;
+  Future<void> _reloadBoard() async {
+    _data = await _todoReadService.loadBoard(
+      selectedGroupId: _selectedGroupId,
+      groupVisibility: _groupVisibility,
+      itemFilter: _itemFilter,
+      itemSort: _itemSort,
+    );
+    _selectedGroupId = _data?.selectedGroup?.group.id;
+    _syncSelectionWithVisibleItems();
   }
 
   void _syncSelectionWithVisibleItems() {
-    final visibleIds = _flattenVisibleItems(_data?.selectedGroup?.rootItems ?? const [])
+    final visibleIds = (_data?.selectedGroup?.rootItems ?? const [])
         .map((node) => node.item.id)
         .toSet();
     _selectedItemIds = _selectedItemIds.where(visibleIds.contains).toSet();

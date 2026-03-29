@@ -51,3 +51,11 @@ class AiException extends AppException {
     super.originalException,
   });
 }
+
+class ReminderException extends AppException {
+  const ReminderException({
+    required super.message,
+    super.code,
+    super.originalException,
+  });
+}

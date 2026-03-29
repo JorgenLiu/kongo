@@ -1,9 +1,13 @@
-String formatDateTimeLabel(DateTime value) {
+String formatIsoDate(DateTime value) {
   final month = value.month.toString().padLeft(2, '0');
   final day = value.day.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day';
+}
+
+String formatDateTimeLabel(DateTime value) {
   final hour = value.hour.toString().padLeft(2, '0');
   final minute = value.minute.toString().padLeft(2, '0');
-  return '${value.year}-$month-$day $hour:$minute';
+  return '${formatIsoDate(value)} $hour:$minute';
 }
 
 String formatTimeOnly(DateTime value) {

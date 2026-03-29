@@ -7,6 +7,7 @@ import '../../services/read/contact_read_service.dart';
 import '../../services/read/todo_read_service.dart';
 import '../../widgets/common/detail_skeleton.dart';
 import '../../widgets/common/error_state.dart';
+import '../../widgets/common/responsive_detail_layout.dart';
 import '../../widgets/contact/contact_detail_attachments_section.dart';
 import '../../widgets/contact/contact_detail_events_section.dart';
 import '../../widgets/contact/contact_detail_header.dart';
@@ -94,76 +95,35 @@ class _ContactDetailView extends StatelessWidget {
                     onAttachmentsTap: () => showPendingContactModuleHint(context, '附件'),
                   ),
                   const SizedBox(height: AppSpacing.lg),
-                  if (wide)
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Column(
-                              children: [
-                                ContactDetailInfoSection(contact: data.contact),
-                                const SizedBox(height: AppSpacing.lg),
-                                ContactDetailTagsSection(tags: data.tags),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.md),
-                          Expanded(
-                            flex: 2,
-                            child: Column(
-                              children: [
-                                ContactDetailMilestonesSection(
-                                  milestones: data.milestones,
-                                  onAdd: () => addMilestoneAction(context, data.contact.id),
-                                  onEdit: (milestone) => editMilestoneAction(context, milestone),
-                                  onDelete: (milestone) => deleteMilestoneAction(context, milestone),
-                                ),
-                                const SizedBox(height: AppSpacing.lg),
-                                ContactDetailAttachmentsSection(
-                                  attachments: data.attachments,
-                                  onOpenModule: () => showPendingContactModuleHint(context, '附件'),
-                                ),
-                                const SizedBox(height: AppSpacing.lg),
-                                RelatedTodoSection(
-                                  title: '相关待办',
-                                  emptyMessage: '当前还没有关联到这个联系人的待办项。',
-                                  items: provider.linkedTodoItems,
-                                  onCreate: () => createTodoFromContactDetailAction(context, data.contact),
-                                  onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                  ...buildResponsiveDetailSections(
+                    wide: wide,
+                    primarySections: [
+                      ContactDetailInfoSection(contact: data.contact),
+                      const SizedBox(height: AppSpacing.lg),
+                      ContactDetailTagsSection(tags: data.tags),
+                    ],
+                    secondarySections: [
+                      ContactDetailMilestonesSection(
+                        milestones: data.milestones,
+                        onAdd: () => addMilestoneAction(context, data.contact.id),
+                        onEdit: (milestone) => editMilestoneAction(context, milestone),
+                        onDelete: (milestone) => deleteMilestoneAction(context, milestone),
                       ),
-                    )
-                  else ...[
-                    ContactDetailInfoSection(contact: data.contact),
-                    const SizedBox(height: AppSpacing.lg),
-                    ContactDetailTagsSection(tags: data.tags),
-                    const SizedBox(height: AppSpacing.lg),
-                    ContactDetailMilestonesSection(
-                      milestones: data.milestones,
-                      onAdd: () => addMilestoneAction(context, data.contact.id),
-                      onEdit: (milestone) => editMilestoneAction(context, milestone),
-                      onDelete: (milestone) => deleteMilestoneAction(context, milestone),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    ContactDetailAttachmentsSection(
-                      attachments: data.attachments,
-                      onOpenModule: () => showPendingContactModuleHint(context, '附件'),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    RelatedTodoSection(
-                      title: '相关待办',
-                      emptyMessage: '当前还没有关联到这个联系人的待办项。',
-                      items: provider.linkedTodoItems,
-                      onCreate: () => createTodoFromContactDetailAction(context, data.contact),
-                      onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
-                    ),
-                  ],
+                      const SizedBox(height: AppSpacing.lg),
+                      ContactDetailAttachmentsSection(
+                        attachments: data.attachments,
+                        onOpenModule: () => showPendingContactModuleHint(context, '附件'),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      RelatedTodoSection(
+                        title: '相关待办',
+                        emptyMessage: '当前还没有关联到这个联系人的待办项。',
+                        items: provider.linkedTodoItems,
+                        onCreate: () => createTodoFromContactDetailAction(context, data.contact),
+                        onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: AppSpacing.lg),
                   ContactDetailEventsSection(
                     contact: data.contact,

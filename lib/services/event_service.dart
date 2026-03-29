@@ -13,6 +13,7 @@ import '../repositories/contact_repository.dart';
 import '../repositories/event_repository.dart';
 import '../utils/event_participant_roles.dart';
 import '../utils/text_normalize.dart';
+import 'reminder_service.dart';
 
 abstract class EventService {
   Future<List<EventType>> getEventTypes();
@@ -36,20 +37,24 @@ abstract class EventService {
     String? eventTypeId,
   });
   Future<List<Event>> getUpcomingEvents({int days = 30});
+  Future<List<Event>> getEventsByDate(DateTime date);
 }
 
 class DefaultEventService implements EventService {
   final EventRepository _eventRepository;
   final ContactRepository _contactRepository;
   final AttachmentRepository _attachmentRepository;
+  final ReminderService? _reminderService;
   final Uuid _uuid;
 
   DefaultEventService(
     this._eventRepository,
     this._contactRepository,
     this._attachmentRepository, {
+    ReminderService? reminderService,
     Uuid? uuid,
-  }) : _uuid = uuid ?? const Uuid();
+  })  : _reminderService = reminderService,
+        _uuid = uuid ?? const Uuid();
 
   @override
   Future<List<EventType>> getEventTypes() {
@@ -99,11 +104,10 @@ class DefaultEventService implements EventService {
       participantRoles: draft.participantRoles,
     );
     final participantIds = participantRoles.keys.toList();
-    if (participantIds.isEmpty) {
-      throw const ValidationException(message: '事件至少需要一个参与人', code: 'event_participants_required');
-    }
 
-    await _ensureContactIdsExist(participantIds);
+    if (participantIds.isNotEmpty) {
+      await _ensureContactIdsExist(participantIds);
+    }
     await _ensureOptionalContactExists(draft.createdByContactId);
     await _ensureOptionalEventTypeExists(draft.eventTypeId);
 
@@ -124,12 +128,16 @@ class DefaultEventService implements EventService {
     );
 
     final created = await _eventRepository.insert(event);
-    await setParticipants(
-      created.id,
-      participantIds,
-      participantRoles: participantRoles,
-    );
-    return _eventRepository.getById(created.id);
+    if (participantIds.isNotEmpty) {
+      await setParticipants(
+        created.id,
+        participantIds,
+        participantRoles: participantRoles,
+      );
+    }
+    final saved = await _eventRepository.getById(created.id);
+    await _syncReminderSafely(() => _reminderService?.syncEventReminder(saved));
+    return saved;
   }
 
   @override
@@ -144,7 +152,7 @@ class DefaultEventService implements EventService {
     await _ensureOptionalContactExists(event.createdByContactId);
     await _ensureOptionalEventTypeExists(event.eventTypeId);
 
-    return _eventRepository.update(
+    final updated = await _eventRepository.update(
       event.copyWith(
         title: normalizedTitle,
         location: normalizeOptionalText(event.location),
@@ -152,6 +160,8 @@ class DefaultEventService implements EventService {
         updatedAt: DateTime.now(),
       ),
     );
+    await _syncReminderSafely(() => _reminderService?.syncEventReminder(updated));
+    return updated;
   }
 
   @override
@@ -159,6 +169,7 @@ class DefaultEventService implements EventService {
     await _eventRepository.getById(id);
     await _attachmentRepository.unlinkAllByOwner(AttachmentOwnerType.event, id);
     await _eventRepository.delete(id);
+    await _syncReminderSafely(() => _reminderService?.removeEventReminder(id));
   }
 
   @override
@@ -262,6 +273,11 @@ class DefaultEventService implements EventService {
     return _eventRepository.getUpcomingEvents(days: days);
   }
 
+  @override
+  Future<List<Event>> getEventsByDate(DateTime date) {
+    return _eventRepository.getEventsByDate(date);
+  }
+
   List<String> _normalizeParticipantIds(List<String> contactIds) {
     return contactIds
         .map((contactId) => contactId.trim())
@@ -309,6 +325,12 @@ class DefaultEventService implements EventService {
     if (startAt != null && endAt != null && endAt.isBefore(startAt)) {
       throw const ValidationException(message: '事件结束时间不能早于开始时间', code: 'invalid_event_time_range');
     }
+  }
+
+  Future<void> _syncReminderSafely(Future<void>? Function() action) async {
+    try {
+      await action();
+    } catch (_) {}
   }
 
 

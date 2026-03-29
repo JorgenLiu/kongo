@@ -259,8 +259,8 @@ class _DesktopShellLayoutState extends State<DesktopShellLayout> {
                             label: Text('待办'),
                           ),
                           NavigationRailDestination(
-                            icon: Icon(Icons.summarize_outlined),
-                            label: Text('总结'),
+                            icon: Icon(Icons.edit_note_outlined),
+                            label: Text('记录'),
                           ),
                           NavigationRailDestination(
                             icon: Icon(Icons.settings_outlined),

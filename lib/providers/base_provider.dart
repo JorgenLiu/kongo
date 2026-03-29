@@ -13,6 +13,9 @@ abstract class BaseProvider extends ChangeNotifier {
   bool get initialized => _initialized;
 
   @protected
+  bool get isDisposed => _disposed;
+
+  @protected
   void markInitialized([bool value = true]) {
     _initialized = value;
   }
@@ -23,14 +26,14 @@ abstract class BaseProvider extends ChangeNotifier {
     }
 
     _error = null;
-    _notifyListenersSafely();
+    notifyListenersSafely();
   }
 
   @protected
   Future<void> execute(Future<void> Function() action) async {
     _loading = true;
     _error = null;
-    _notifyListenersSafely();
+    notifyListenersSafely();
 
     try {
       await action();
@@ -38,7 +41,7 @@ abstract class BaseProvider extends ChangeNotifier {
       _error = ProviderError.fromObject(error);
     } finally {
       _loading = false;
-      _notifyListenersSafely();
+      notifyListenersSafely();
     }
   }
 
@@ -48,7 +51,8 @@ abstract class BaseProvider extends ChangeNotifier {
     super.dispose();
   }
 
-  void _notifyListenersSafely() {
+  @protected
+  void notifyListenersSafely() {
     if (_disposed) {
       return;
     }

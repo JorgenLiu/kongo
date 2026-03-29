@@ -20,6 +20,7 @@ class HomeOverviewContent extends StatelessWidget {
   final ValueChanged<DateTime> onOpenEventsByDate;
   final ValueChanged<String> onOpenEventDetail;
   final VoidCallback onOpenSummaries;
+  final VoidCallback onOpenNotes;
   final ValueChanged<String> onOpenContactDetail;
 
   const HomeOverviewContent({
@@ -34,6 +35,7 @@ class HomeOverviewContent extends StatelessWidget {
     required this.onOpenEventsByDate,
     required this.onOpenEventDetail,
     required this.onOpenSummaries,
+    required this.onOpenNotes,
     required this.onOpenContactDetail,
   });
 
@@ -43,26 +45,7 @@ class HomeOverviewContent extends StatelessWidget {
       key: const ValueKey('home_content'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: HomeStatRow(
-                contactCount: data.totalContacts,
-                weekEventCount: data.weekEvents.length,
-                pendingActionCount: data.pendingActions.length,
-                onContactsTap: onOpenContacts,
-                onWeekEventsTap: onOpenEvents,
-                onPendingActionsTap: onOpenTodos,
-              ),
-            ),
-            const SizedBox(width: AppSpacing.md),
-            QuickActionsBar(
-              onCreateContact: onCreateContact,
-              onCreateEvent: onCreateEvent,
-            ),
-          ],
-        ),
+        _buildSupportEntryBar(context),
         const SizedBox(height: AppSpacing.lg),
         // 周历全宽：横向日期列越多，导航感越强
         HomeWeekPlanSection(
@@ -135,6 +118,84 @@ class HomeOverviewContent extends StatelessWidget {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildSupportEntryBar(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= AppBreakpoints.standard;
+        final stats = HomeStatRow(
+          contactCount: data.totalContacts,
+          weekEventCount: data.weekEvents.length,
+          pendingActionCount: data.pendingActions.length,
+          onContactsTap: onOpenContacts,
+          onWeekEventsTap: onOpenEvents,
+          onPendingActionsTap: onOpenTodos,
+        );
+        final actions = QuickActionsBar(
+          onCreateContact: onCreateContact,
+          onCreateEvent: onCreateEvent,
+        );
+        final notesEntry = _NotesQuickEntry(
+          todayNotesCount: data.todayNotesCount,
+          onTap: onOpenNotes,
+        );
+
+        if (wide) {
+          return Row(
+            key: const Key('homeSupportEntryBarWide'),
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(child: stats),
+              const SizedBox(width: AppSpacing.sm),
+              notesEntry,
+              const SizedBox(width: AppSpacing.sm),
+              actions,
+            ],
+          );
+        }
+
+        return Column(
+          key: const Key('homeSupportEntryBarCompact'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            stats,
+            const SizedBox(height: AppSpacing.sm),
+            notesEntry,
+            const SizedBox(height: AppSpacing.sm),
+            actions,
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _NotesQuickEntry extends StatelessWidget {
+  final int todayNotesCount;
+  final VoidCallback onTap;
+
+  const _NotesQuickEntry({required this.todayNotesCount, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final label = todayNotesCount > 0 ? '今日已记 $todayNotesCount 条' : '今日记录';
+
+    return TextButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.edit_note, size: 16),
+      label: Text(label),
+      style: TextButton.styleFrom(
+        foregroundColor: colorScheme.primary,
+        textStyle: theme.textTheme.labelMedium,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+      ),
     );
   }
 }

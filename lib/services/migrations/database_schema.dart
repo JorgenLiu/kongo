@@ -14,7 +14,8 @@ CREATE TABLE contacts (
   notes TEXT,
   avatarPath TEXT,
   createdAt INTEGER NOT NULL,
-  updatedAt INTEGER NOT NULL
+    updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER
 )
 ''';
 
@@ -24,7 +25,8 @@ CREATE TABLE tags (
   name TEXT NOT NULL UNIQUE,
   color TEXT,
   createdAt INTEGER NOT NULL,
-  updatedAt INTEGER NOT NULL
+    updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER
 )
 ''';
 
@@ -66,6 +68,7 @@ CREATE TABLE events (
   createdByContactId TEXT,
   createdAt INTEGER NOT NULL,
   updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER,
   FOREIGN KEY (eventTypeId) REFERENCES event_types(id),
   FOREIGN KEY (createdByContactId) REFERENCES contacts(id)
 )
@@ -113,6 +116,7 @@ CREATE TABLE daily_summaries (
   aiJobId TEXT,
   createdAt INTEGER NOT NULL,
   updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER,
   FOREIGN KEY (createdByContactId) REFERENCES contacts(id)
 )
 ''';
@@ -141,7 +145,8 @@ CREATE TABLE attachments (
   sourceLastVerifiedAt INTEGER,
   importPolicy TEXT,
   createdAt INTEGER NOT NULL,
-  updatedAt INTEGER NOT NULL
+    updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER
 )
 ''';
 
@@ -199,6 +204,7 @@ CREATE TABLE contact_milestones (
   notes TEXT,
   createdAt INTEGER NOT NULL,
   updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER,
   FOREIGN KEY (contactId) REFERENCES contacts(id) ON DELETE CASCADE
 )
 ''';
@@ -219,7 +225,8 @@ CREATE TABLE todo_groups (
     sortOrder INTEGER NOT NULL DEFAULT 0,
     archivedAt INTEGER,
     createdAt INTEGER NOT NULL,
-    updatedAt INTEGER NOT NULL
+    updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER
 )
 ''';
 
@@ -238,6 +245,7 @@ CREATE TABLE todo_items (
     sortOrder INTEGER NOT NULL DEFAULT 0,
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL,
+    deletedAt INTEGER,
     FOREIGN KEY (groupId) REFERENCES todo_groups(id) ON DELETE CASCADE,
     FOREIGN KEY (parentItemId) REFERENCES todo_items(id) ON DELETE CASCADE
 )
@@ -395,6 +403,34 @@ const String createTodoItemEventsItemIdIndex =
 const String createTodoItemEventsEventIdIndex =
     'CREATE INDEX idx_todo_item_events_eventId ON todo_item_events(eventId)';
 
+// ──────────────────── quick_notes (v10) ────────────────────
+
+const String createQuickNotesTable = '''
+  CREATE TABLE IF NOT EXISTS quick_notes (
+    id TEXT PRIMARY KEY,
+    content TEXT NOT NULL,
+    noteType TEXT NOT NULL DEFAULT 'knowledge',
+    linkedContactId TEXT,
+    linkedEventId TEXT,
+    sessionGroup TEXT,
+    aiMetadata TEXT,
+    enrichedAt TEXT,
+    captureDate TEXT NOT NULL,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL,
+    deletedAt TEXT
+  )
+''';
+
+const String createQuickNotesCaptureDateIndex =
+    'CREATE INDEX idx_quick_notes_captureDate ON quick_notes(captureDate)';
+
+const String createQuickNotesSessionGroupIndex =
+    'CREATE INDEX idx_quick_notes_sessionGroup ON quick_notes(sessionGroup)';
+
+const String createQuickNotesLinkedContactIdIndex =
+    'CREATE INDEX idx_quick_notes_linkedContactId ON quick_notes(linkedContactId)';
+
 // ──────────────────── 语句列表 ────────────────────
 
 /// 全量建表 + 索引（onCreate 使用）。
@@ -455,6 +491,10 @@ const List<String> createSchemaStatements = [
     createTodoItemContactsContactIdIndex,
     createTodoItemEventsItemIdIndex,
     createTodoItemEventsEventIdIndex,
+    createQuickNotesTable,
+    createQuickNotesCaptureDateIndex,
+    createQuickNotesSessionGroupIndex,
+    createQuickNotesLinkedContactIdIndex,
 ];
 
 /// v1 → v2 迁移语句（新增事件/附件/AI 表）。

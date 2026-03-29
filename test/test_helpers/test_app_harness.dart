@@ -4,8 +4,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:kongo/services/app_dependencies.dart';
+import 'package:kongo/services/ai_secret_store.dart';
 import 'package:kongo/services/attachment_preview_service.dart';
 import 'package:kongo/services/database_service.dart';
+import 'package:kongo/services/reminder_interaction_service.dart';
+import 'package:kongo/services/reminder_platform_gateway.dart';
 
 import 'test_fixture_data.dart';
 
@@ -33,6 +36,8 @@ Future<TestAppHarness> createTestAppHarnessWithOptions({
   Future<Directory> Function()? attachmentsDirectoryResolver,
   Future<Directory> Function()? attachmentPreviewsDirectoryResolver,
   AttachmentPreviewGenerator? attachmentPreviewGenerator,
+  ReminderPlatformGateway? reminderPlatformGateway,
+  ReminderInteractionService? reminderInteractionService,
 }) async {
   TestWidgetsFlutterBinding.ensureInitialized();
   if (!_sqfliteFfiInitialized) {
@@ -61,6 +66,9 @@ Future<TestAppHarness> createTestAppHarnessWithOptions({
           required sourcePath,
           required previewsDirectory,
         }) async => null,
+      aiSecretStore: UnsupportedAiSecretStore(),
+    reminderPlatformGateway: reminderPlatformGateway ?? UnsupportedReminderPlatformGateway(),
+    reminderInteractionService: reminderInteractionService,
   );
 
   await seedTestFixtureData(dependencies);

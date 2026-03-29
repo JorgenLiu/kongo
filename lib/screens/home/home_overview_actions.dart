@@ -12,6 +12,7 @@ import '../contacts/contacts_list_screen.dart';
 import '../events/event_detail_screen.dart';
 import '../events/event_form_screen.dart';
 import '../events/events_list_screen.dart';
+import '../notes/notes_overview_screen.dart';
 import '../summaries/summary_form_screen.dart';
 import '../summaries/summary_overview_screen.dart';
 import '../todos/todo_board_screen.dart';
@@ -93,6 +94,12 @@ Future<void> createSummaryFromHome(BuildContext context) async {
 Future<void> openSummariesFromHome(BuildContext context) async {
   await Navigator.of(context).push<void>(
     SlidePageRoute(builder: (_) => const SummaryOverviewScreen()),
+  );
+}
+
+Future<void> openNotesFromHome(BuildContext context) async {
+  await Navigator.of(context).push<void>(
+    SlidePageRoute(builder: (_) => const NotesOverviewScreen()),
   );
 }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../exceptions/app_exception.dart';
 import '../../models/attachment.dart';
 import '../../models/attachment_link.dart';
 import '../../models/event.dart';
@@ -8,8 +9,10 @@ import '../../models/event_draft.dart';
 import '../../providers/attachment_provider.dart';
 import '../../providers/event_detail_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../services/event_service.dart';
 import '../../utils/attachment_action_helpers.dart';
 import '../../utils/contact_action_helpers.dart';
+import '../../utils/event_follow_up_note_formatter.dart';
 import '../../utils/event_action_helpers.dart';
 import '../../config/page_transitions.dart';
 import '../../utils/navigation_helpers.dart';
@@ -95,22 +98,16 @@ Future<void> deleteEventDetail(
     return;
   }
 
-  if (provider.error != null) {
-    showProviderResultSnackBar(
-      context,
-      error: provider.error,
-      successMessage: '事件已删除',
-      onErrorHandled: provider.clearError,
-    );
-    return;
-  }
-
   showProviderResultSnackBar(
     context,
-    error: null,
+    error: provider.error,
     successMessage: '事件已删除',
+    onErrorHandled: provider.clearError,
   );
-  Navigator.of(context).pop(true);
+
+  if (provider.error == null) {
+    Navigator.of(context).pop(true);
+  }
 }
 
 Future<void> addEventAttachment(
@@ -238,5 +235,57 @@ Future<void> deleteEventAttachment(
 
   if (provider.error == null) {
     await context.read<EventDetailProvider>().refresh();
+  }
+}
+
+Future<void> saveEventFollowUpNote(
+  BuildContext context, {
+  required Event event,
+  required String note,
+}) async {
+  final normalizedNote = note.trim();
+  if (normalizedNote.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('请先输入会后补充内容')),
+    );
+    return;
+  }
+
+  final eventService = context.read<EventService>();
+  try {
+    await eventService.updateEvent(
+      event.copyWith(
+        description: appendEventFollowUpNote(event.description, normalizedNote),
+      ),
+    );
+
+    if (!context.mounted) {
+      return;
+    }
+
+    await context.read<EventDetailProvider>().refresh();
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('会后补充已保存')));
+  } on AppException catch (error) {
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(error.message)));
+  } catch (_) {
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(const SnackBar(content: Text('保存会后补充失败，请稍后重试')));
   }
 }

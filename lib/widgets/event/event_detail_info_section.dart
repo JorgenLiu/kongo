@@ -33,7 +33,12 @@ class EventDetailInfoSection extends StatelessWidget {
           ),
           LabeledInfoRow(label: '地点', value: event.location),
           LabeledInfoRow(label: '创建人', value: createdByContact?.name),
-          LabeledInfoRow(label: '提醒', value: event.reminderEnabled ? '已开启' : '未开启'),
+          LabeledInfoRow(
+            label: '提醒',
+            value: event.reminderEnabled && event.reminderAt != null
+                ? '已开启 · ${formatDateTimeLabel(event.reminderAt!)}'
+                : '未开启',
+          ),
           LabeledInfoRow(label: '描述', value: event.description, multiline: true),
         ],
       ),

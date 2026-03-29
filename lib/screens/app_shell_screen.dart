@@ -5,9 +5,9 @@ import '../config/app_constants.dart';
 import 'contacts/contacts_list_screen.dart';
 import 'desktop_shell_layout.dart';
 import 'home/home_overview_screen.dart';
+import 'notes/notes_overview_screen.dart';
 import 'search/global_search_screen.dart';
 import 'settings/settings_overview_screen.dart';
-import 'summaries/summary_overview_screen.dart';
 import 'todos/todo_board_screen.dart';
 
 class AppShellScreen extends StatefulWidget {
@@ -46,7 +46,7 @@ class _AppShellScreenState extends State<AppShellScreen> {
           NavigationDestination(icon: Icon(Icons.contacts_outlined), label: '通讯录'),
           NavigationDestination(icon: Icon(Icons.search_outlined), label: '检索'),
           NavigationDestination(icon: Icon(Icons.checklist_rtl_outlined), label: '待办'),
-          NavigationDestination(icon: Icon(Icons.summarize_outlined), label: '总结'),
+          NavigationDestination(icon: Icon(Icons.edit_note_outlined), label: '记录'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), label: '设置'),
         ],
       ),
@@ -81,7 +81,7 @@ class _AppShellScreenState extends State<AppShellScreen> {
       case 3:
         return const TodoBoardScreen();
       case 4:
-        return const SummaryOverviewScreen();
+        return const NotesOverviewScreen();
       case 5:
         return const SettingsOverviewScreen();
       default:

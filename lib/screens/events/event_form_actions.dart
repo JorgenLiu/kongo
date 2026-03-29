@@ -17,6 +17,8 @@ EventDraft? validateAndBuildEventDraft({
   required Map<String, String> selectedParticipantRoles,
   required DateTime? startAt,
   required DateTime? endAt,
+  required bool reminderEnabled,
+  required DateTime? reminderAt,
   required Event? initialEvent,
   required ValueChanged<String> onParticipantError,
 }) {
@@ -36,6 +38,27 @@ EventDraft? validateAndBuildEventDraft({
     return null;
   }
 
+  if (reminderEnabled && startAt == null) {
+    ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+      const SnackBar(content: Text('启用事件提醒前请先设置开始时间')),
+    );
+    return null;
+  }
+
+  if (reminderEnabled && reminderAt == null) {
+    ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+      const SnackBar(content: Text('请选择提醒时间')),
+    );
+    return null;
+  }
+
+  if (reminderEnabled && reminderAt != null && startAt != null && reminderAt.isAfter(startAt)) {
+    ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+      const SnackBar(content: Text('提醒时间不能晚于开始时间')),
+    );
+    return null;
+  }
+
   return EventDraft(
     title: titleController.text.trim(),
     eventTypeId: selectedEventTypeId,
@@ -43,8 +66,8 @@ EventDraft? validateAndBuildEventDraft({
     endAt: endAt,
     location: _normalize(locationController.text),
     description: _normalize(descriptionController.text),
-    reminderEnabled: initialEvent?.reminderEnabled ?? false,
-    reminderAt: initialEvent?.reminderAt,
+    reminderEnabled: reminderEnabled,
+    reminderAt: reminderEnabled ? reminderAt : null,
     createdByContactId: selectedCreatedByContactId,
     participantIds: selectedParticipantRoles.keys.toList(),
     participantRoles: selectedParticipantRoles,

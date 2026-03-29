@@ -16,8 +16,9 @@ class HomeOverviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider(
-      create: (context) =>
-          HomeProvider(context.read<HomeReadService>())..load(),
+      create: (context) => HomeProvider(
+        context.read<HomeReadService>(),
+      )..load(),
       child: const _HomeOverviewView(),
     );
   }
@@ -74,6 +75,7 @@ class _HomeOverviewView extends StatelessWidget {
                     ),
                     onOpenEventDetail: (id) => openEventDetailFromHome(context, id),
                     onOpenSummaries: () => openSummariesFromHome(context),
+                    onOpenNotes: () => openNotesFromHome(context),
                     onOpenContactDetail: (id) => openContactDetailFromHome(context, id),
                   );
                 }

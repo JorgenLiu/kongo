@@ -8,20 +8,24 @@ import '../../services/read/event_read_service.dart';
 import '../../services/read/todo_read_service.dart';
 import '../../widgets/common/detail_skeleton.dart';
 import '../../widgets/common/error_state.dart';
+import '../../widgets/common/responsive_detail_layout.dart';
 import '../../widgets/event/event_detail_attachments_section.dart';
 import '../../widgets/event/event_detail_header.dart';
 import '../../widgets/event/event_detail_info_section.dart';
 import '../../widgets/event/event_detail_participants_section.dart';
+import '../../widgets/event/event_post_event_follow_up_card.dart';
 import '../../widgets/todo/related_todo_section.dart';
 import 'event_detail_actions.dart';
 import '../todos/todo_link_actions.dart';
 
 class EventDetailScreen extends StatelessWidget {
   final String eventId;
+  final bool preferPostEventFollowUp;
 
   const EventDetailScreen({
     super.key,
     required this.eventId,
+    this.preferPostEventFollowUp = false,
   });
 
   @override
@@ -32,13 +36,15 @@ class EventDetailScreen extends StatelessWidget {
         context.read<TodoReadService>(),
         eventId,
       )..load(),
-      child: const _EventDetailView(),
+      child: _EventDetailView(preferPostEventFollowUp: preferPostEventFollowUp),
     );
   }
 }
 
 class _EventDetailView extends StatelessWidget {
-  const _EventDetailView();
+  final bool preferPostEventFollowUp;
+
+  const _EventDetailView({required this.preferPostEventFollowUp});
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +61,7 @@ class _EventDetailView extends StatelessWidget {
                     IconButton(
                       tooltip: '编辑事件',
                       icon: const Icon(Icons.edit_outlined),
-                      onPressed: () => _editEvent(
+                      onPressed: () => editEventDetail(
                         context,
                         event: data.event,
                         participantRoles: {
@@ -67,7 +73,7 @@ class _EventDetailView extends StatelessWidget {
                     IconButton(
                       tooltip: '删除事件',
                       icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _deleteEvent(context, event: data.event),
+                      onPressed: () => deleteEventDetail(context, event: data.event),
                     ),
                   ],
           ),
@@ -102,6 +108,7 @@ class _EventDetailView extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final wide = constraints.maxWidth >= AppBreakpoints.wide;
+          final showPostEventFollowUp = _shouldShowPostEventFollowUp(data.event);
           return ListView(
             padding: const EdgeInsets.all(AppSpacing.md),
             children: [
@@ -111,105 +118,65 @@ class _EventDetailView extends StatelessWidget {
                 participantCount: data.participants.length,
                 attachmentCount: data.attachments.length,
               ),
-              const SizedBox(height: AppSpacing.lg),
-              if (wide)
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: EventDetailInfoSection(
-                          event: data.event,
-                          createdByContact: data.createdByContact,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        flex: 2,
-                        child: Column(
-                          children: [
-                            EventDetailParticipantsSection(
-                              participants: data.participantEntries,
-                              onOpenContact: (participant) =>
-                                  openEventParticipantContactDetail(
-                                      context, participant.contact.id),
-                            ),
-                            const SizedBox(height: AppSpacing.lg),
-                            EventDetailAttachmentsSection(
-                              attachments: data.attachments,
-                              onAddAttachment: () =>
-                                  addEventAttachment(context, event: data.event),
-                              onOpenAttachment: (attachment) => openEventAttachment(
-                                context,
-                                attachment: attachment,
-                              ),
-                              onUnlinkAttachment: (attachment) =>
-                                  unlinkEventAttachment(
-                                context,
-                                event: data.event,
-                                attachment: attachment,
-                              ),
-                              onDeleteAttachment: (attachment) =>
-                                  deleteEventAttachment(
-                                context,
-                                event: data.event,
-                                attachment: attachment,
-                              ),
-                            ),
-                            const SizedBox(height: AppSpacing.lg),
-                            RelatedTodoSection(
-                              title: '相关待办',
-                              emptyMessage: '当前还没有关联到这个事件的待办项。',
-                              items: provider.linkedTodoItems,
-                              onCreate: () => createTodoFromEventDetailAction(context, data.event),
-                              onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else ...[
-                EventDetailInfoSection(
-                  event: data.event,
-                  createdByContact: data.createdByContact,
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                EventDetailParticipantsSection(
-                  participants: data.participantEntries,
-                  onOpenContact: (participant) =>
-                      openEventParticipantContactDetail(context, participant.contact.id),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                EventDetailAttachmentsSection(
-                  attachments: data.attachments,
-                  onAddAttachment: () => addEventAttachment(context, event: data.event),
-                  onOpenAttachment: (attachment) => openEventAttachment(
-                    context,
-                    attachment: attachment,
-                  ),
-                  onUnlinkAttachment: (attachment) => unlinkEventAttachment(
+              if (showPostEventFollowUp) ...[
+                const SizedBox(height: AppSpacing.md),
+                EventPostEventFollowUpCard(
+                  autofocus: preferPostEventFollowUp,
+                  onSave: (note) => saveEventFollowUpNote(
                     context,
                     event: data.event,
-                    attachment: attachment,
+                    note: note,
                   ),
-                  onDeleteAttachment: (attachment) => deleteEventAttachment(
-                    context,
-                    event: data.event,
-                    attachment: attachment,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                RelatedTodoSection(
-                  title: '相关待办',
-                  emptyMessage: '当前还没有关联到这个事件的待办项。',
-                  items: provider.linkedTodoItems,
-                  onCreate: () => createTodoFromEventDetailAction(context, data.event),
-                  onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
                 ),
               ],
+              const SizedBox(height: AppSpacing.lg),
+              ...buildResponsiveDetailSections(
+                wide: wide,
+                primarySections: [
+                  EventDetailInfoSection(
+                    event: data.event,
+                    createdByContact: data.createdByContact,
+                  ),
+                ],
+                secondarySections: [
+                  EventDetailParticipantsSection(
+                    participants: data.participantEntries,
+                    onOpenContact: (participant) =>
+                        openEventParticipantContactDetail(
+                            context, participant.contact.id),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  EventDetailAttachmentsSection(
+                    attachments: data.attachments,
+                    onAddAttachment: () =>
+                        addEventAttachment(context, event: data.event),
+                    onOpenAttachment: (attachment) => openEventAttachment(
+                      context,
+                      attachment: attachment,
+                    ),
+                    onUnlinkAttachment: (attachment) =>
+                        unlinkEventAttachment(
+                      context,
+                      event: data.event,
+                      attachment: attachment,
+                    ),
+                    onDeleteAttachment: (attachment) =>
+                        deleteEventAttachment(
+                      context,
+                      event: data.event,
+                      attachment: attachment,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  RelatedTodoSection(
+                    title: '相关待办',
+                    emptyMessage: '当前还没有关联到这个事件的待办项。',
+                    items: provider.linkedTodoItems,
+                    onCreate: () => createTodoFromEventDetailAction(context, data.event),
+                    onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
+                  ),
+                ],
+              ),
             ],
           );
         },
@@ -224,19 +191,17 @@ class _EventDetailView extends StatelessWidget {
     );
   }
 
-  Future<void> _editEvent(
-    BuildContext context, {
-    required Event event,
-    required Map<String, String> participantRoles,
-  }) {
-    return editEventDetail(
-      context,
-      event: event,
-      participantRoles: participantRoles,
-    );
-  }
+  bool _shouldShowPostEventFollowUp(Event event) {
+    final anchorTime = event.endAt ?? event.startAt;
+    if (anchorTime == null) {
+      return false;
+    }
 
-  Future<void> _deleteEvent(BuildContext context, {required Event event}) {
-    return deleteEventDetail(context, event: event);
+    final now = DateTime.now();
+    if (anchorTime.isAfter(now)) {
+      return false;
+    }
+
+    return anchorTime.isAfter(now.subtract(const Duration(days: 3)));
   }
 }

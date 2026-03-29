@@ -102,23 +102,16 @@ Future<void> deleteContactDetail(
     return;
   }
 
-  if (provider.error != null) {
-    showProviderResultSnackBar(
-      context,
-      error: provider.error,
-      successMessage: '联系人已删除',
-      onErrorHandled: provider.clearError,
-    );
-    return;
-  }
-
   showProviderResultSnackBar(
     context,
-    error: null,
+    error: provider.error,
     successMessage: '联系人已删除',
+    onErrorHandled: provider.clearError,
   );
 
-  Navigator.of(context).pop();
+  if (provider.error == null) {
+    Navigator.of(context).pop();
+  }
 }
 
 void showPendingContactModuleHint(BuildContext context, String moduleName) {

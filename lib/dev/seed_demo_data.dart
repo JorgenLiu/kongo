@@ -7,9 +7,13 @@ import 'package:sqflite/sqflite.dart';
 
 import 'package:kongo/models/contact.dart';
 import 'package:kongo/models/contact_draft.dart';
+import 'package:kongo/models/contact_milestone.dart';
+import 'package:kongo/models/contact_milestone_draft.dart';
 import 'package:kongo/models/event_draft.dart';
 import 'package:kongo/models/tag.dart';
 import 'package:kongo/models/tag_draft.dart';
+import 'package:kongo/models/todo_group_draft.dart';
+import 'package:kongo/models/todo_item_draft.dart';
 import 'package:kongo/services/app_dependencies.dart';
 import 'package:kongo/services/database_service.dart';
 
@@ -29,6 +33,8 @@ Future<void> main() async {
     debugPrint('Database: $databasePath');
     debugPrint('Inserted contacts: ${result.insertedContacts}');
     debugPrint('Inserted events: ${result.insertedEvents}');
+    debugPrint('Inserted milestones: ${result.insertedMilestones}');
+    debugPrint('Inserted todos: ${result.insertedTodos}');
     debugPrint('Inserted tags: ${result.insertedTags}');
     debugPrint('Tag assignments across seeded tags: ${result.totalTagAssignments}');
     debugPrint('Seeded contact pool: ${result.totalSeededContacts}');
@@ -101,14 +107,68 @@ Future<SeedDemoDataResult> seedDemoData(AppDependencies dependencies) async {
     insertedEvents++;
   }
 
+  // 今天的专属事件（确保 AI 简报有「今天」的上下文）
+  final now = DateTime.now();
+  final todayEventSeeds = [
+    (
+      '季度业务对齐会议',
+      '与核心团队确认 Q2 目标与资源分配。',
+      '总部会议室A',
+      DateTime(now.year, now.month, now.day, 10, 0),
+    ),
+    (
+      '关键客户战略沟通',
+      '讨论年度合作框架与下半年计划。',
+      '客户办公室',
+      DateTime(now.year, now.month, now.day, 14, 30),
+    ),
+    (
+      '新合作方初次见面',
+      '了解对方背景，探讨潜在合作空间。',
+      '咖啡厅·静安',
+      DateTime(now.year, now.month, now.day, 16, 0),
+    ),
+  ];
+
+  for (final (title, desc, loc, startAt) in todayEventSeeds) {
+    if (existingEventTitles.contains(title)) continue;
+    final participants = _pickParticipants(seededContacts, insertedEvents);
+    await dependencies.eventService.createEvent(
+      EventDraft(
+        title: title,
+        eventTypeId: eventTypes[insertedEvents % eventTypes.length].id,
+        startAt: startAt,
+        endAt: startAt.add(const Duration(hours: 1, minutes: 30)),
+        location: loc,
+        description: desc,
+        createdByContactId: participants.first.id,
+        participantIds: participants.map((c) => c.id).toList(),
+      ),
+    );
+    insertedEvents++;
+  }
+
   final tagResult = await _seedTagsAndAssignments(
     dependencies: dependencies,
     contacts: allContacts,
   );
 
+  final insertedMilestones = await _seedMilestones(
+    dependencies: dependencies,
+    contacts: seededContacts,
+  );
+
+  final insertedTodos = await _seedTodos(
+    dependencies: dependencies,
+    contacts: seededContacts,
+    events: (await dependencies.eventService.getEvents()),
+  );
+
   return SeedDemoDataResult(
     insertedContacts: insertedContacts,
     insertedEvents: insertedEvents,
+    insertedMilestones: insertedMilestones,
+    insertedTodos: insertedTodos,
     totalSeededContacts: seededContacts.length,
     insertedTags: tagResult.insertedTags,
     totalSeededTags: tagResult.totalSeededTags,
@@ -256,6 +316,8 @@ _EventTimeWindow _buildTimeWindow(int index) {
 class SeedDemoDataResult {
   final int insertedContacts;
   final int insertedEvents;
+  final int insertedMilestones;
+  final int insertedTodos;
   final int totalSeededContacts;
   final int insertedTags;
   final int totalSeededTags;
@@ -264,6 +326,8 @@ class SeedDemoDataResult {
   const SeedDemoDataResult({
     required this.insertedContacts,
     required this.insertedEvents,
+    required this.insertedMilestones,
+    required this.insertedTodos,
     required this.totalSeededContacts,
     required this.insertedTags,
     required this.totalSeededTags,
@@ -303,6 +367,113 @@ class _EventTimeWindow {
     required this.startAt,
     required this.endAt,
   });
+}
+
+// ── 里程碑种子 ────────────────────────────────────────────────────
+
+/// 给 seededContacts 里的指定联系人添加即将到来的里程碑（幂等）。
+/// 只在该联系人还没有任何里程碑时才写入，避免重复。
+Future<int> _seedMilestones({
+  required AppDependencies dependencies,
+  required List<Contact> contacts,
+}) async {
+  if (contacts.isEmpty) return 0;
+
+  final now = DateTime.now();
+  var inserted = 0;
+
+  // 每条记录：(联系人索引偏移, 距今天数, 类型, 可选自定义标签)
+  final milestoneSeeds = [
+    (0, 2, ContactMilestoneType.birthday, null),
+    (1, 5, ContactMilestoneType.weddingAnniversary, null),
+    (2, 3, ContactMilestoneType.collaborationStart, '合作开始'),
+    (3, 7, ContactMilestoneType.birthday, null),
+    (4, 1, ContactMilestoneType.firstMet, '初次见面纪念'),
+    (5, 10, ContactMilestoneType.birthday, null),
+    (6, 4, ContactMilestoneType.workStart, null),
+    (7, 6, ContactMilestoneType.birthday, null),
+    (8, 14, ContactMilestoneType.weddingAnniversary, null),
+    (9, 2, ContactMilestoneType.collaborationStart, '战略合作启动'),
+  ];
+
+  for (final (offset, daysFromNow, type, label) in milestoneSeeds) {
+    final contact = contacts[offset % contacts.length];
+    final existing = await dependencies.contactMilestoneService.getMilestones(contact.id);
+    if (existing.any((m) => m.type == type)) continue;
+
+    // milestoneDate 的年份不重要（recurring=true），只关心月/日
+    // 设置为今年的「今天 + daysFromNow」
+    final target = now.add(Duration(days: daysFromNow));
+    await dependencies.contactMilestoneService.createMilestone(
+      contact.id,
+      ContactMilestoneDraft(
+        type: type,
+        label: label,
+        milestoneDate: DateTime(now.year - 1, target.month, target.day),
+        isRecurring: true,
+        reminderEnabled: false,
+      ),
+    );
+    inserted++;
+  }
+
+  return inserted;
+}
+
+// ── 待办事项种子 ──────────────────────────────────────────────────
+
+/// 创建一个「跟进清单」分组，写入多条未完成的 pending action 并关联联系人/事件。
+/// 幂等：如果已有标题完全相同的分组就跳过。
+Future<int> _seedTodos({
+  required AppDependencies dependencies,
+  required List<Contact> contacts,
+  required List<dynamic> events,
+}) async {
+  if (contacts.isEmpty) return 0;
+
+  const groupTitle = '关键跟进清单（Demo）';
+  final board = await dependencies.todoReadService.loadBoard();
+  if (board.groups.any((g) => g.group.title == groupTitle)) return 0;
+
+  final group = await dependencies.todoService.createGroup(
+    const TodoGroupDraft(
+      title: groupTitle,
+      description: '由 seedDemoData 自动生成的跟进事项，用于测试 AI 简报推荐效果。',
+    ),
+  );
+
+  // (联系人索引, 事件索引或-1, 待办标题)
+  final itemSeeds = [
+    (0, 0, '跟进 Q2 合作提案，确认对方决策时间'),
+    (1, -1, '发送上次会议纪要并确认签字'),
+    (2, 1, '整理产品演示反馈并回复'),
+    (3, -1, '确认下季度预算讨论会议时间'),
+    (4, 0, '准备复盘会议所需数据报告'),
+    (5, -1, '联系已超过90天未互动的重要客户'),
+    (6, 2, '跟进合同修订进展'),
+    (7, -1, '发送节日问候并约下次面见'),
+  ];
+
+  var inserted = 0;
+  for (final (contactOffset, eventOffset, title) in itemSeeds) {
+    final contact = contacts[contactOffset % contacts.length];
+    final contactIds = [contact.id];
+    final eventIds = (eventOffset >= 0 && events.isNotEmpty)
+        ? [(events[eventOffset % events.length] as dynamic).id as String]
+        : <String>[];
+
+    await dependencies.todoService.createItem(
+      group.id,
+      TodoItemDraft(
+        title: title,
+        contactIds: contactIds,
+        eventIds: eventIds,
+      ),
+    );
+    inserted++;
+  }
+
+  return inserted;
 }
 
 class _PickedContact {

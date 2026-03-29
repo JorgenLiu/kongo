@@ -1,9 +1,13 @@
+import 'dart:async';
 import 'dart:io';
 
 import '../ai/ai_provider.dart';
 import '../ai/ai_service.dart';
+import '../ai/openai_compatible_provider.dart';
+import '../config/ai_config_store.dart';
 import '../providers/contact_provider.dart';
 import '../providers/files_provider.dart';
+import '../providers/notes_provider.dart';
 import '../providers/attachment_provider.dart';
 import '../providers/todo_board_provider.dart';
 import '../repositories/app_preference_repository.dart';
@@ -16,21 +20,32 @@ import '../repositories/ai_job_repository.dart';
 import '../repositories/attachment_repository.dart';
 import '../repositories/contact_milestone_repository.dart';
 import '../repositories/contact_repository.dart';
+import '../repositories/daily_brief_delivery_repository.dart';
 import '../repositories/event_repository.dart';
 import '../repositories/summary_repository.dart';
 import '../repositories/tag_repository.dart';
 import 'attachment_preview_service.dart';
+import 'ai_secret_store.dart';
 import 'attachment_service.dart';
 import 'calendar_time_node_settings_service.dart';
 import 'contact_milestone_service.dart';
 import 'contact_service.dart';
 import 'database_service.dart';
+import 'daily_brief_delivery_service.dart';
 import 'event_service.dart';
+import 'home_daily_brief_service.dart';
+import 'quick_capture_service.dart';
+import 'quick_note_enrichment_service.dart';
 import 'read/contact_read_service.dart';
 import 'read/event_read_service.dart';
 import 'read/home_read_service.dart';
+import 'read/notes_read_service.dart';
 import 'read/summary_read_service.dart';
 import 'read/todo_read_service.dart';
+import '../repositories/quick_note_repository.dart';
+import 'reminder_platform_gateway.dart';
+import 'reminder_interaction_service.dart';
+import 'reminder_service.dart';
 import 'settings_preferences_store.dart';
 import 'summary_service.dart';
 import 'tag_service.dart';
@@ -51,15 +66,25 @@ class AppDependencies {
   final SummaryService summaryService;
   final AttachmentService attachmentService;
   final ContactMilestoneService contactMilestoneService;
+  final ReminderService reminderService;
+  final ReminderInteractionService reminderInteractionService;
   final SettingsPreferencesStore settingsPreferencesStore;
+  final AiSecretStore aiSecretStore;
+  final AiConfigStore aiConfigStore;
   final CalendarTimeNodeSettingsService calendarTimeNodeSettingsService;
   final TodoService todoService;
   final ContactReadService contactReadService;
   final EventReadService eventReadService;
   final HomeReadService homeReadService;
+  final HomeDailyBriefService homeDailyBriefService;
+  final DailyBriefDeliveryService dailyBriefDeliveryService;
   final SummaryReadService summaryReadService;
   final TodoReadService todoReadService;
   final AiService aiService;
+  final QuickCaptureService quickCaptureService;
+  final QuickNoteEnrichmentService quickNoteEnrichmentService;
+  final NotesReadService notesReadService;
+  final NotesProvider notesProvider;
 
   AppDependencies._({
     required this.databaseService,
@@ -76,15 +101,25 @@ class AppDependencies {
     required this.summaryService,
     required this.attachmentService,
     required this.contactMilestoneService,
+    required this.reminderService,
+    required this.reminderInteractionService,
     required this.settingsPreferencesStore,
+    required this.aiSecretStore,
+    required this.aiConfigStore,
     required this.calendarTimeNodeSettingsService,
     required this.todoService,
     required this.contactReadService,
     required this.eventReadService,
     required this.homeReadService,
+    required this.homeDailyBriefService,
+    required this.dailyBriefDeliveryService,
     required this.summaryReadService,
     required this.todoReadService,
     required this.aiService,
+    required this.quickCaptureService,
+    required this.quickNoteEnrichmentService,
+    required this.notesReadService,
+    required this.notesProvider,
   });
 
   static Future<AppDependencies> bootstrap({
@@ -96,6 +131,9 @@ class AppDependencies {
     Future<Directory> Function()? settingsDirectoryResolver,
     AttachmentPreviewGenerator? attachmentPreviewGenerator,
     AiProvider? aiProvider,
+    AiSecretStore? aiSecretStore,
+    ReminderPlatformGateway? reminderPlatformGateway,
+    ReminderInteractionService? reminderInteractionService,
   }) async {
     final resolvedDatabaseService = databaseService ?? DatabaseService();
     await resolvedDatabaseService.initDatabase();
@@ -127,24 +165,50 @@ class AppDependencies {
       attachmentsDirectoryResolver: attachmentsDirectoryResolver,
       attachmentPreviewService: attachmentPreviewService,
     );
+    final settingsPreferencesStore = JsonSettingsPreferencesStore(
+      settingsDirectoryResolver: settingsDirectoryResolver,
+      legacyPreferenceRepository: appPreferenceRepository,
+    );
+    final resolvedReminderPlatformGateway = reminderPlatformGateway ??
+        (Platform.isMacOS
+            ? MethodChannelReminderPlatformGateway()
+            : UnsupportedReminderPlatformGateway());
+    final resolvedReminderInteractionService = reminderInteractionService ??
+      (Platform.isMacOS
+        ? MethodChannelReminderInteractionService()
+        : UnsupportedReminderInteractionService());
+    final resolvedAiSecretStore = aiSecretStore ?? (Platform.isMacOS
+        ? MethodChannelAiSecretStore()
+      : UnsupportedAiSecretStore());
+    final reminderService = DefaultReminderService(
+      resolvedReminderPlatformGateway,
+      settingsPreferencesStore,
+      eventRepository,
+      milestoneRepository,
+      contactRepository,
+    );
     final eventService = DefaultEventService(
       eventRepository,
       contactRepository,
       attachmentRepository,
+      reminderService: reminderService,
     );
     final tagService = DefaultTagService(tagRepository, contactRepository);
     final contactService = DefaultContactService(
       contactRepository,
       tagRepository,
       eventRepository,
+      contactMilestoneRepository: milestoneRepository,
+      reminderService: reminderService,
     );
     final contactMilestoneService = DefaultContactMilestoneService(
       milestoneRepository,
       contactRepository,
+      reminderService: reminderService,
     );
-    final settingsPreferencesStore = JsonSettingsPreferencesStore(
-      settingsDirectoryResolver: settingsDirectoryResolver,
-      legacyPreferenceRepository: appPreferenceRepository,
+    final aiConfigStore = AiConfigStore(
+      settingsPreferencesStore,
+      secretStore: resolvedAiSecretStore,
     );
     final calendarTimeNodeSettingsService =
         DefaultCalendarTimeNodeSettingsService(settingsPreferencesStore);
@@ -178,16 +242,34 @@ class AppDependencies {
       contactRepository,
       eventRepository,
     );
+    final quickNoteRepository = SqliteQuickNoteRepository(resolvedDatabaseService);
     final homeReadService = DefaultHomeReadService(
       eventReadService,
       contactRepository,
       contactMilestoneService,
-      summaryService,
+      todoGroupRepository,
+      todoItemRepository,
+      quickNoteRepository,
     );
+    final resolvedAiProvider = aiProvider ?? await _loadConfiguredAiProvider(aiConfigStore);
     final aiService = DefaultAiService(
-      provider: aiProvider,
+      provider: resolvedAiProvider,
       aiJobRepository: aiJobRepository,
     );
+    final homeDailyBriefService = DefaultHomeDailyBriefService(aiService);
+    final dailyBriefDeliveryRepository = SettingsDailyBriefDeliveryRepository(
+      settingsPreferencesStore,
+    );
+    final dailyBriefDeliveryService = DefaultDailyBriefDeliveryService(
+      dailyBriefDeliveryRepository,
+    );
+
+    final quickCaptureService = DefaultQuickCaptureService(resolvedDatabaseService, quickNoteRepository);
+    final quickNoteEnrichmentService = DefaultQuickNoteEnrichmentService(
+      aiService,
+      quickNoteRepository,
+    );
+    final notesReadService = DefaultNotesReadService(quickNoteRepository, summaryRepository);
 
     final contactProvider = ContactProvider(contactService, contactMilestoneService);
     final attachmentProvider = AttachmentProvider(attachmentService);
@@ -199,9 +281,16 @@ class AppDependencies {
     final summaryProvider = SummaryProvider(summaryService);
     final tagProvider = TagProvider(tagService);
     final todoBoardProvider = TodoBoardProvider(todoReadService, todoService);
+    final notesProvider = NotesProvider(
+      notesReadService,
+      captureService: quickCaptureService,
+      enrichmentService: quickNoteEnrichmentService,
+    );
     if (preloadContacts) {
       await contactProvider.loadContacts();
     }
+
+    unawaited(reminderService.rebuildPendingReminders().catchError((_) {}));
 
     return AppDependencies._(
       databaseService: resolvedDatabaseService,
@@ -218,19 +307,31 @@ class AppDependencies {
       summaryService: summaryService,
       attachmentService: attachmentService,
       contactMilestoneService: contactMilestoneService,
+      reminderService: reminderService,
+      reminderInteractionService: resolvedReminderInteractionService,
       settingsPreferencesStore: settingsPreferencesStore,
+      aiSecretStore: resolvedAiSecretStore,
+      aiConfigStore: aiConfigStore,
       calendarTimeNodeSettingsService: calendarTimeNodeSettingsService,
       todoService: todoService,
       contactReadService: contactReadService,
       eventReadService: eventReadService,
       homeReadService: homeReadService,
+      homeDailyBriefService: homeDailyBriefService,
+      dailyBriefDeliveryService: dailyBriefDeliveryService,
       summaryReadService: summaryReadService,
       todoReadService: todoReadService,
       aiService: aiService,
+      quickCaptureService: quickCaptureService,
+      quickNoteEnrichmentService: quickNoteEnrichmentService,
+      notesReadService: notesReadService,
+      notesProvider: notesProvider,
     );
   }
 
   Future<void> dispose({bool deleteDatabase = false}) async {
+    await reminderInteractionService.dispose();
+
     if (deleteDatabase) {
       await databaseService.deleteDatabaseFile();
       return;
@@ -238,4 +339,17 @@ class AppDependencies {
 
     await databaseService.closeDatabase();
   }
+}
+
+Future<AiProvider?> _loadConfiguredAiProvider(AiConfigStore store) async {
+  final settings = await store.load();
+  final providerConfig = settings.toProviderConfig();
+  if (providerConfig == null) {
+    return null;
+  }
+
+  return OpenAiCompatibleProvider(
+    providerId: settings.presetProvider.name,
+    config: providerConfig,
+  );
 }

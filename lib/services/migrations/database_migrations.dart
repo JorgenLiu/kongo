@@ -39,6 +39,12 @@ Future<void> onUpgradeDatabase(Database db, int oldVersion, int newVersion) asyn
   if (oldVersion < 8) {
     await migrateToVersion8(db);
   }
+  if (oldVersion < 9) {
+    await migrateToVersion9(db);
+  }
+  if (oldVersion < 10) {
+    await migrateToVersion10(db);
+  }
 }
 
 // ──────────────────── v1 → v2 ────────────────────
@@ -288,6 +294,36 @@ Future<void> migrateToVersion8(Database db) async {
   await batch.commit(noResult: true);
 }
 
+// ──────────────────── v8 → v9 ────────────────────
+
+Future<void> migrateToVersion9(Database db) async {
+  for (final table in const [
+    'contacts',
+    'tags',
+    'events',
+    'daily_summaries',
+    'attachments',
+    'contact_milestones',
+    'todo_groups',
+    'todo_items',
+  ]) {
+    if (await _columnExists(db, table, 'deletedAt')) {
+      continue;
+    }
+
+    await db.execute('ALTER TABLE $table ADD COLUMN deletedAt INTEGER');
+  }
+}
+
+// ──────────────────── v9 → v10 ────────────────────
+
+Future<void> migrateToVersion10(Database db) async {
+  await db.execute(createQuickNotesTable);
+  await db.execute(createQuickNotesCaptureDateIndex);
+  await db.execute(createQuickNotesSessionGroupIndex);
+  await db.execute(createQuickNotesLinkedContactIdIndex);
+}
+
 // ──────────────────── 预置数据 ────────────────────
 
 Future<void> seedDefaultEventTypes(Database db) async {
@@ -345,6 +381,11 @@ Future<bool> _tableExists(Database db, String tableName) async {
   );
 
   return (result.first['count'] as int?) == 1;
+}
+
+Future<bool> _columnExists(Database db, String tableName, String columnName) async {
+  final columns = await db.rawQuery('PRAGMA table_info($tableName)');
+  return columns.any((column) => column['name'] == columnName);
 }
 
 DateTime? _parseLegacyDate(String? value) {

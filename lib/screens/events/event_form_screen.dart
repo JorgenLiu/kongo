@@ -4,14 +4,18 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_constants.dart';
 import '../../models/event.dart';
+import '../../models/reminder_default_offset.dart';
 import '../../providers/event_provider.dart';
 import '../../providers/tag_provider.dart';
+import '../../services/settings_preferences_store.dart';
+import '../../utils/reminder_default_time_resolver.dart';
 import '../../utils/unsaved_changes_guard.dart';
 import '../../utils/event_participant_roles.dart';
 import '../../utils/text_normalize.dart';
 import '../../widgets/common/error_state.dart';
 import '../../widgets/event/event_form_basic_section.dart';
 import '../../widgets/event/event_form_participants_section.dart';
+import '../../widgets/event/event_form_reminder_section.dart';
 import '../../widgets/event/event_form_schedule_section.dart';
 import 'event_form_actions.dart';
 
@@ -48,6 +52,13 @@ class _EventFormScreenState extends State<EventFormScreen> {
   late Map<String, String> _selectedParticipantRoles;
   DateTime? _startAt;
   DateTime? _endAt;
+  late bool _reminderEnabled;
+  DateTime? _reminderAt;
+  late bool _initialReminderEnabledBaseline;
+  DateTime? _initialReminderAtBaseline;
+  ReminderDefaultOffset _eventDefaultOffset = ReminderDefaultOffset.minutes30;
+  bool _didLoadReminderDefaults = false;
+  bool _didManuallyEditReminder = false;
   String? _participantErrorText;
   bool _isSaving = false;
   bool _allowPop = false;
@@ -74,6 +85,10 @@ class _EventFormScreenState extends State<EventFormScreen> {
     };
     _startAt = initialEvent?.startAt ?? widget.initialStartAt;
     _endAt = initialEvent?.endAt;
+    _reminderEnabled = initialEvent?.reminderEnabled ?? false;
+    _reminderAt = initialEvent?.reminderAt;
+    _initialReminderEnabledBaseline = _reminderEnabled;
+    _initialReminderAtBaseline = _reminderAt;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadInitialData();
@@ -180,11 +195,31 @@ class _EventFormScreenState extends State<EventFormScreen> {
                           onStartChanged: (value) {
                             setState(() {
                               _startAt = value;
+                              _maybeApplyDefaultReminderFromStartChange();
                             });
                           },
                           onEndChanged: (value) {
                             setState(() {
                               _endAt = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        EventFormReminderSection(
+                          reminderEnabled: _reminderEnabled,
+                          reminderAt: _reminderAt,
+                          startAt: _startAt,
+                          onReminderEnabledChanged: (value) {
+                            setState(() {
+                              _didManuallyEditReminder = true;
+                              _reminderEnabled = value;
+                              _reminderAt = value ? (_reminderAt ?? _defaultReminderAt()) : null;
+                            });
+                          },
+                          onReminderAtChanged: (value) {
+                            setState(() {
+                              _didManuallyEditReminder = true;
+                              _reminderAt = value;
                             });
                           },
                         ),
@@ -223,14 +258,30 @@ class _EventFormScreenState extends State<EventFormScreen> {
   }
 
   Future<void> _loadInitialData() async {
-    await context.read<EventProvider>().loadFormOptions();
+    final eventProvider = context.read<EventProvider>();
+    final tagProvider = context.read<TagProvider>();
+    final settingsStore = context.read<SettingsPreferencesStore>();
+
+    await eventProvider.loadFormOptions();
     if (!mounted) {
       return;
     }
 
-    final tagProvider = context.read<TagProvider>();
     if (!tagProvider.initialized && !tagProvider.loading) {
       await tagProvider.loadTags();
+    }
+
+    if (!widget.isEditing && !_didLoadReminderDefaults) {
+      final settings = await settingsStore.getReminderSettings();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _eventDefaultOffset = settings.eventDefaultOffset;
+        _applyReminderDefaults();
+        _didLoadReminderDefaults = true;
+      });
     }
   }
 
@@ -269,6 +320,8 @@ class _EventFormScreenState extends State<EventFormScreen> {
       selectedParticipantRoles: _selectedParticipantRoles,
       startAt: _startAt,
       endAt: _endAt,
+      reminderEnabled: _reminderEnabled,
+      reminderAt: _reminderAt,
       initialEvent: widget.initialEvent,
       onParticipantError: (message) {
         setState(() {
@@ -318,6 +371,21 @@ class _EventFormScreenState extends State<EventFormScreen> {
     if (_endAt != initialEvent?.endAt) {
       return true;
     }
+    if (widget.isEditing) {
+      if (_reminderEnabled != (initialEvent?.reminderEnabled ?? false)) {
+        return true;
+      }
+      if (_reminderAt != initialEvent?.reminderAt) {
+        return true;
+      }
+    } else {
+      if (_reminderEnabled != _initialReminderEnabledBaseline) {
+        return true;
+      }
+      if (_reminderAt != _initialReminderAtBaseline) {
+        return true;
+      }
+    }
 
     final initialParticipantRoles = {
       ...widget.initialParticipantRoles.map(
@@ -327,5 +395,37 @@ class _EventFormScreenState extends State<EventFormScreen> {
         widget.suggestedContactId!: EventParticipantRoles.participant,
     };
     return !mapEquals(_selectedParticipantRoles, initialParticipantRoles);
+  }
+
+  DateTime _defaultReminderAt() {
+    return resolveEventReminderAtFromDefaultOffset(
+          startAt: _startAt ?? DateTime.now().add(const Duration(hours: 1)),
+          offset: ReminderDefaultOffset.minutes30,
+        ) ??
+        DateTime.now().add(const Duration(minutes: 30));
+  }
+
+  void _applyReminderDefaults() {
+    _reminderEnabled = _eventDefaultOffset.isEnabled;
+    _reminderAt = resolveEventReminderAtFromDefaultOffset(
+      startAt: _startAt,
+      offset: _eventDefaultOffset,
+    );
+    _initialReminderEnabledBaseline = _reminderEnabled;
+    _initialReminderAtBaseline = _reminderAt;
+  }
+
+  void _maybeApplyDefaultReminderFromStartChange() {
+    if (widget.isEditing || !_didLoadReminderDefaults || _didManuallyEditReminder) {
+      return;
+    }
+
+    _reminderEnabled = _eventDefaultOffset.isEnabled;
+    _reminderAt = resolveEventReminderAtFromDefaultOffset(
+      startAt: _startAt,
+      offset: _eventDefaultOffset,
+    );
+    _initialReminderEnabledBaseline = _reminderEnabled;
+    _initialReminderAtBaseline = _reminderAt;
   }
 }

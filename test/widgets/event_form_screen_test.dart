@@ -2,11 +2,59 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 
+import 'package:kongo/models/reminder_default_offset.dart';
+import 'package:kongo/models/reminder_settings.dart';
 import 'package:kongo/providers/event_provider.dart';
 import 'package:kongo/providers/tag_provider.dart';
 import 'package:kongo/screens/events/event_form_screen.dart';
+import 'package:kongo/services/settings_preferences_store.dart';
+import 'package:kongo/models/calendar_time_node_settings.dart';
 
 import '../test_helpers/test_app_harness.dart';
+
+class InMemorySettingsPreferencesStore implements SettingsPreferencesStore {
+  ReminderSettings _reminderSettings = const ReminderSettings();
+  ThemeMode _themeMode = ThemeMode.system;
+  CalendarTimeNodeSettings _calendarSettings = const CalendarTimeNodeSettings();
+  final Map<String, String> _values = <String, String>{};
+
+  @override
+  Future<CalendarTimeNodeSettings> getCalendarTimeNodeSettings() async => _calendarSettings;
+
+  @override
+  Future<ReminderSettings> getReminderSettings() async => _reminderSettings;
+
+  @override
+  Future<String?> getString(String key) async => _values[key];
+
+  @override
+  Future<ThemeMode> getThemeMode() async => _themeMode;
+
+  @override
+  Future<void> removeKey(String key) async {
+    _values.remove(key);
+  }
+
+  @override
+  Future<void> setCalendarTimeNodeSettings(CalendarTimeNodeSettings settings) async {
+    _calendarSettings = settings;
+  }
+
+  @override
+  Future<void> setReminderSettings(ReminderSettings settings) async {
+    _reminderSettings = settings;
+  }
+
+  @override
+  Future<void> setString(String key, String value) async {
+    _values[key] = value;
+  }
+
+  @override
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+  }
+}
 
 Future<void> pumpUntilFound(
   WidgetTester tester,
@@ -26,11 +74,13 @@ Future<void> pumpUntilFound(
 Widget buildEventFormScreen(
   TestAppHarness harness, {
   DateTime? initialStartAt,
+  required SettingsPreferencesStore settingsPreferencesStore,
 }) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<EventProvider>.value(value: harness.dependencies.eventProvider),
       ChangeNotifierProvider<TagProvider>.value(value: harness.dependencies.tagProvider),
+      Provider<SettingsPreferencesStore>.value(value: settingsPreferencesStore),
     ],
     child: MaterialApp(
       home: EventFormScreen(initialStartAt: initialStartAt),
@@ -41,9 +91,11 @@ Widget buildEventFormScreen(
 
 void main() {
   late TestAppHarness harness;
+  late InMemorySettingsPreferencesStore settingsPreferencesStore;
 
   setUp(() async {
     harness = await createTestAppHarness();
+    settingsPreferencesStore = InMemorySettingsPreferencesStore();
     await harness.dependencies.eventProvider.loadFormOptions();
     await harness.dependencies.tagProvider.loadTags();
   });
@@ -61,7 +113,12 @@ void main() {
       zhangSanId = contacts.firstWhere((contact) => contact.name == '张三').id;
     });
 
-    await tester.pumpWidget(buildEventFormScreen(harness));
+    await tester.pumpWidget(
+      buildEventFormScreen(
+        harness,
+        settingsPreferencesStore: settingsPreferencesStore,
+      ),
+    );
     await pumpUntilFound(tester, find.byKey(const Key('eventForm_participantSearchField')));
 
     expect(find.byType(CheckboxListTile), findsNothing);
@@ -85,7 +142,12 @@ void main() {
       zhangSanId = contacts.firstWhere((contact) => contact.name == '张三').id;
     });
 
-    await tester.pumpWidget(buildEventFormScreen(harness));
+    await tester.pumpWidget(
+      buildEventFormScreen(
+        harness,
+        settingsPreferencesStore: settingsPreferencesStore,
+      ),
+    );
     await pumpUntilFound(tester, find.byKey(const Key('eventForm_participantSearchField')));
 
     await tester.enterText(
@@ -111,11 +173,53 @@ void main() {
     final initialStartAt = DateTime(2026, 3, 26, 14, 0);
 
     await tester.pumpWidget(
-      buildEventFormScreen(harness, initialStartAt: initialStartAt),
+      buildEventFormScreen(
+        harness,
+        initialStartAt: initialStartAt,
+        settingsPreferencesStore: settingsPreferencesStore,
+      ),
     );
     await pumpUntilFound(tester, find.byKey(const Key('eventForm_startDateField')));
 
-    expect(find.text('2026-03-26'), findsOneWidget);
-    expect(find.text('14:00'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('eventForm_startDateField')),
+        matching: find.text('2026-03-26'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('eventForm_startTimeField')),
+        matching: find.text('14:00'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Event form applies configured default reminder offset when creating', (
+    WidgetTester tester,
+  ) async {
+    await settingsPreferencesStore.setReminderSettings(
+      const ReminderSettings(eventDefaultOffset: ReminderDefaultOffset.hour1),
+    );
+
+    final initialStartAt = DateTime(2026, 3, 26, 14, 0);
+    await tester.pumpWidget(
+      buildEventFormScreen(
+        harness,
+        initialStartAt: initialStartAt,
+        settingsPreferencesStore: settingsPreferencesStore,
+      ),
+    );
+
+    await pumpUntilFound(tester, find.byKey(const Key('eventForm_startDateField')));
+    await pumpUntilFound(tester, find.text('13:00'));
+
+    final switchTile = tester.widget<SwitchListTile>(
+      find.widgetWithText(SwitchListTile, '启用事件提醒'),
+    );
+    expect(switchTile.value, isTrue);
+    expect(find.text('13:00'), findsOneWidget);
   });
 }

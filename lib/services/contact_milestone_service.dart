@@ -6,6 +6,7 @@ import '../models/contact_milestone_draft.dart';
 import '../repositories/contact_milestone_repository.dart';
 import '../repositories/contact_repository.dart';
 import '../utils/text_normalize.dart';
+import 'reminder_service.dart';
 
 abstract class ContactMilestoneService {
   Future<List<ContactMilestone>> getAllMilestones();
@@ -20,13 +21,16 @@ abstract class ContactMilestoneService {
 class DefaultContactMilestoneService implements ContactMilestoneService {
   final ContactMilestoneRepository _milestoneRepository;
   final ContactRepository _contactRepository;
+  final ReminderService? _reminderService;
   final Uuid _uuid;
 
   DefaultContactMilestoneService(
     this._milestoneRepository,
     this._contactRepository, {
+    ReminderService? reminderService,
     Uuid? uuid,
-  }) : _uuid = uuid ?? const Uuid();
+  })  : _reminderService = reminderService,
+        _uuid = uuid ?? const Uuid();
 
   @override
   Future<List<ContactMilestone>> getAllMilestones() {
@@ -77,7 +81,9 @@ class DefaultContactMilestoneService implements ContactMilestoneService {
       updatedAt: now,
     );
 
-    return _milestoneRepository.insert(milestone);
+    final created = await _milestoneRepository.insert(milestone);
+    await _syncReminderSafely(() => _reminderService?.syncMilestoneReminder(created));
+    return created;
   }
 
   @override
@@ -95,18 +101,27 @@ class DefaultContactMilestoneService implements ContactMilestoneService {
     }
 
     final updated = milestone.copyWith(updatedAt: DateTime.now());
-    return _milestoneRepository.update(updated);
+    final saved = await _milestoneRepository.update(updated);
+    await _syncReminderSafely(() => _reminderService?.syncMilestoneReminder(saved));
+    return saved;
   }
 
   @override
   Future<void> deleteMilestone(String id) async {
     await _milestoneRepository.getById(id);
     await _milestoneRepository.delete(id);
+    await _syncReminderSafely(() => _reminderService?.removeMilestoneReminder(id));
   }
 
   @override
   Future<List<ContactMilestone>> getUpcomingMilestones({int days = 30}) {
     return _milestoneRepository.getUpcoming(days: days);
+  }
+
+  Future<void> _syncReminderSafely(Future<void>? Function() action) async {
+    try {
+      await action();
+    } catch (_) {}
   }
 
 }
