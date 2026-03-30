@@ -105,6 +105,7 @@ class _LabeledDropdown<T> extends StatelessWidget {
       ),
       inputDecorationTheme: InputDecorationTheme(
         isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 10),
         filled: true,
         fillColor: colorScheme.surfaceContainerLow,
         border: OutlineInputBorder(

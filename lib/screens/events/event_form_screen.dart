@@ -17,6 +17,7 @@ import '../../widgets/event/event_form_basic_section.dart';
 import '../../widgets/event/event_form_participants_section.dart';
 import '../../widgets/event/event_form_reminder_section.dart';
 import '../../widgets/event/event_form_schedule_section.dart';
+import '../../widgets/common/side_sheet_scaffold.dart';
 import 'event_form_actions.dart';
 
 class EventFormScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class EventFormScreen extends StatefulWidget {
   final String? suggestedContactId;
   final String? initialTitle;
   final DateTime? initialStartAt;
+  final bool sideSheet;
 
   const EventFormScreen({
     super.key,
@@ -33,6 +35,7 @@ class EventFormScreen extends StatefulWidget {
     this.suggestedContactId,
     this.initialTitle,
     this.initialStartAt,
+    this.sideSheet = false,
   });
 
   bool get isEditing => initialEvent != null;
@@ -107,22 +110,28 @@ class _EventFormScreenState extends State<EventFormScreen> {
   Widget build(BuildContext context) {
     final title = widget.isEditing ? '编辑事件' : '新建事件';
 
+    if (widget.sideSheet) {
+      return PopScope(
+        canPop: _allowPop || !_hasUnsavedChanges,
+        child: SideSheetScaffold(
+          title: title,
+          onClose: _handleClose,
+          action: FilledButton.tonal(
+            onPressed: _isSaving ? null : _submit,
+            child: const Text('保存'),
+          ),
+          body: _buildFormBody(),
+        ),
+      );
+    }
+
     return PopScope(
       canPop: _allowPop || !_hasUnsavedChanges,
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () async {
-              if (_allowPop || !_hasUnsavedChanges) {
-                Navigator.of(context).pop();
-                return;
-              }
-              final shouldDiscard = await showDiscardChangesDialog(context);
-              if (shouldDiscard && context.mounted) {
-                Navigator.of(context).pop();
-              }
-            },
+            onPressed: _handleClose,
           ),
           title: Text(title),
           actions: [
@@ -135,125 +144,141 @@ class _EventFormScreenState extends State<EventFormScreen> {
             ),
           ],
         ),
-        body: Consumer2<EventProvider, TagProvider>(
-          builder: (context, provider, tagProvider, _) {
-          final loadingInitialData =
-              (provider.loading && !provider.initialized) ||
-              (tagProvider.loading && !tagProvider.initialized);
-          if (loadingInitialData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+        body: _buildFormBody(),
+      ),
+    );
+  }
 
-          if (provider.error != null && !provider.initialized) {
-            return ErrorState(
-              message: provider.error!.message,
-              onRetry: _loadInitialData,
-            );
-          }
+  Future<void> _handleClose() async {
+    final navigator = Navigator.of(context);
+    if (_allowPop || !_hasUnsavedChanges) {
+      navigator.pop();
+      return;
+    }
+    final shouldDiscard = await showDiscardChangesDialog(context);
+    if (shouldDiscard && context.mounted) {
+      navigator.pop();
+    }
+  }
 
-          if (tagProvider.error != null && !tagProvider.initialized) {
-            return ErrorState(
-              message: tagProvider.error!.message,
-              onRetry: _loadInitialData,
-            );
-          }
+  Widget _buildFormBody() {
+    return Consumer2<EventProvider, TagProvider>(
+      builder: (context, provider, tagProvider, _) {
+      final loadingInitialData =
+          (provider.loading && !provider.initialized) ||
+          (tagProvider.loading && !tagProvider.initialized);
+      if (loadingInitialData) {
+        return const Center(child: CircularProgressIndicator());
+      }
 
-          return SafeArea(
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: AppDimensions.formMaxWidth),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        EventFormBasicSection(
-                          titleController: _titleController,
-                          locationController: _locationController,
-                          descriptionController: _descriptionController,
-                          selectedEventTypeId: _selectedEventTypeId,
-                          onEventTypeChanged: (value) {
-                            setState(() {
-                              _selectedEventTypeId = value;
-                            });
-                          },
-                          selectedCreatedByContactId: _selectedCreatedByContactId,
-                          onCreatedByContactChanged: (value) {
-                            setState(() {
-                              _selectedCreatedByContactId = value;
-                            });
-                          },
-                          eventTypes: provider.eventTypes,
-                          contacts: provider.availableContacts,
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        EventFormScheduleSection(
-                          startAt: _startAt,
-                          endAt: _endAt,
-                          onStartChanged: (value) {
-                            setState(() {
-                              _startAt = value;
-                              _maybeApplyDefaultReminderFromStartChange();
-                            });
-                          },
-                          onEndChanged: (value) {
-                            setState(() {
-                              _endAt = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        EventFormReminderSection(
-                          reminderEnabled: _reminderEnabled,
-                          reminderAt: _reminderAt,
-                          startAt: _startAt,
-                          onReminderEnabledChanged: (value) {
-                            setState(() {
-                              _didManuallyEditReminder = true;
-                              _reminderEnabled = value;
-                              _reminderAt = value ? (_reminderAt ?? _defaultReminderAt()) : null;
-                            });
-                          },
-                          onReminderAtChanged: (value) {
-                            setState(() {
-                              _didManuallyEditReminder = true;
-                              _reminderAt = value;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        EventFormParticipantsSection(
-                          contacts: provider.availableContacts,
-                          tags: tagProvider.tags,
-                          selectedParticipantRoles: _selectedParticipantRoles,
-                          onParticipantToggled: _toggleParticipant,
-                          onParticipantRoleChanged: _changeParticipantRole,
-                          errorText: _participantErrorText,
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        FilledButton(
-                          key: const Key('eventForm_submitButton'),
-                          onPressed: _isSaving ? null : _submit,
-                          child: _isSaving
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : Text(widget.isEditing ? '保存修改' : '创建事件'),
-                        ),
-                      ],
+      if (provider.error != null && !provider.initialized) {
+        return ErrorState(
+          message: provider.error!.message,
+          onRetry: _loadInitialData,
+        );
+      }
+
+      if (tagProvider.error != null && !tagProvider.initialized) {
+        return ErrorState(
+          message: tagProvider.error!.message,
+          onRetry: _loadInitialData,
+        );
+      }
+
+      return SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: AppDimensions.formMaxWidth),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    EventFormBasicSection(
+                      titleController: _titleController,
+                      locationController: _locationController,
+                      descriptionController: _descriptionController,
+                      selectedEventTypeId: _selectedEventTypeId,
+                      onEventTypeChanged: (value) {
+                        setState(() {
+                          _selectedEventTypeId = value;
+                        });
+                      },
+                      selectedCreatedByContactId: _selectedCreatedByContactId,
+                      onCreatedByContactChanged: (value) {
+                        setState(() {
+                          _selectedCreatedByContactId = value;
+                        });
+                      },
+                      eventTypes: provider.eventTypes,
+                      contacts: provider.availableContacts,
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.md),
+                    EventFormScheduleSection(
+                      startAt: _startAt,
+                      endAt: _endAt,
+                      onStartChanged: (value) {
+                        setState(() {
+                          _startAt = value;
+                          _maybeApplyDefaultReminderFromStartChange();
+                        });
+                      },
+                      onEndChanged: (value) {
+                        setState(() {
+                          _endAt = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    EventFormReminderSection(
+                      reminderEnabled: _reminderEnabled,
+                      reminderAt: _reminderAt,
+                      startAt: _startAt,
+                      onReminderEnabledChanged: (value) {
+                        setState(() {
+                          _didManuallyEditReminder = true;
+                          _reminderEnabled = value;
+                          _reminderAt = value ? (_reminderAt ?? _defaultReminderAt()) : null;
+                        });
+                      },
+                      onReminderAtChanged: (value) {
+                        setState(() {
+                          _didManuallyEditReminder = true;
+                          _reminderAt = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    EventFormParticipantsSection(
+                      contacts: provider.availableContacts,
+                      tags: tagProvider.tags,
+                      selectedParticipantRoles: _selectedParticipantRoles,
+                      onParticipantToggled: _toggleParticipant,
+                      onParticipantRoleChanged: _changeParticipantRole,
+                      errorText: _participantErrorText,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    FilledButton(
+                      key: const Key('eventForm_submitButton'),
+                      onPressed: _isSaving ? null : _submit,
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(widget.isEditing ? '保存修改' : '创建事件'),
+                    ),
+                  ],
                 ),
               ),
             ),
-          );
-        },
+          ),
         ),
-      ),
+      );
+    },
     );
   }
 

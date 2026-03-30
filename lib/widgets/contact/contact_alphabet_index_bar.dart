@@ -110,7 +110,9 @@ class _AlphabetIndexItem extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               fontSize: fontSize,
-              color: selected ? colorScheme.onPrimaryContainer : colorScheme.outline,
+              color: selected
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurface.withValues(alpha: 0.55),
               fontWeight: FontWeight.w700,
             ),
           ),

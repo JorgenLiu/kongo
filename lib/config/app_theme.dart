@@ -131,7 +131,7 @@ class AppTheme {
     onTertiary: const Color(0xFF211A11),
     surface: AppColors.surfaceDark,
     onSurface: AppColors.onSurfaceDark,
-    surfaceContainerLow: const Color(0xFF14110E),
+    surfaceContainerLow: const Color(0xFF110F0B),
     surfaceContainerHighest: AppColors.surfaceVariantDark,
     outline: AppColors.cardBorderDark,
     outlineVariant: const Color(0xFF2A251F),
@@ -160,6 +160,8 @@ class AppTheme {
     );
 
     final borderSide = BorderSide(color: borderColor);
+    // 暗色模式：用色阶差代替边框，去除后台管理系统感
+    final cardBorderSide = brightness == Brightness.dark ? BorderSide.none : borderSide;
 
     return base.copyWith(
       appBarTheme: AppBarTheme(
@@ -177,12 +179,15 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: scheme.surface,
         surfaceTintColor: Colors.transparent,
-        elevation: 0.5,
-        shadowColor: scheme.shadow,
+        // 暗色模式加深投影，光源代替边框产生层次感
+        elevation: brightness == Brightness.dark ? 2.5 : 0.5,
+        shadowColor: brightness == Brightness.dark
+            ? const Color(0x55000000)
+            : scheme.shadow,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          side: borderSide,
+          side: cardBorderSide,
         ),
       ),
       dividerTheme: DividerThemeData(
@@ -292,9 +297,10 @@ class AppTheme {
       popupMenuTheme: PopupMenuThemeData(
         color: scheme.surface,
         surfaceTintColor: Colors.transparent,
+        elevation: brightness == Brightness.dark ? 6 : 2,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          side: borderSide,
+          side: cardBorderSide,
         ),
       ),
       switchTheme: SwitchThemeData(
@@ -332,9 +338,13 @@ class AppTheme {
       dialogTheme: DialogThemeData(
         backgroundColor: scheme.surface,
         surfaceTintColor: Colors.transparent,
+        elevation: brightness == Brightness.dark ? 8 : 3,
+        shadowColor: brightness == Brightness.dark
+            ? const Color(0x66000000)
+            : scheme.shadow,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          side: borderSide,
+          side: cardBorderSide,
         ),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -343,14 +353,14 @@ class AppTheme {
         contentTextStyle: TextStyle(color: scheme.onSurface),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
-          side: borderSide,
+          side: cardBorderSide,
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
         backgroundColor: scheme.surfaceContainerHighest,
         selectedColor: accentSoft,
         disabledColor: brightness == Brightness.light ? AppColors.disabled : AppColors.disabledDark,
-        side: borderSide,
+        side: cardBorderSide,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),

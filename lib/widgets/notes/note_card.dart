@@ -30,6 +30,7 @@ class NoteCard extends StatefulWidget {
 
 class _NoteCardState extends State<NoteCard> {
   bool _hovered = false;
+  bool _pressing = false;
 
   List<String> get _topics {
     final raw = widget.note.aiMetadata?['topics'];
@@ -50,13 +51,31 @@ class _NoteCardState extends State<NoteCard> {
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.xs,
-        ),
-        child: Row(
+      onExit: (_) => setState(() { _hovered = false; _pressing = false; }),
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressing = true),
+        onTapUp: (_) => setState(() => _pressing = false),
+        onTapCancel: () => setState(() => _pressing = false),
+        child: AnimatedScale(
+          scale: _pressing ? 0.99 : 1.0,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOutCubic,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            transform: Matrix4.translationValues(0, (_hovered && !_pressing) ? -1.0 : 0.0, 0),
+            transformAlignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: _hovered
+                  ? colorScheme.primary.withValues(alpha: 0.04)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.md),
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xs,
+            ),
+            child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _NoteTypeIndicator(noteType: widget.note.noteType),
@@ -78,6 +97,7 @@ class _NoteCardState extends State<NoteCard> {
                     _TopicsRow(
                       topics: _topics,
                       onClearAll: widget.onClearTopics,
+                      hovered: _hovered,
                     ),
                   ],
                 ],
@@ -108,7 +128,9 @@ class _NoteCardState extends State<NoteCard> {
               ),
             ],
           ],
+          ),
         ),
+      ),
       ),
     );
   }
@@ -117,8 +139,13 @@ class _NoteCardState extends State<NoteCard> {
 class _TopicsRow extends StatelessWidget {
   final List<String> topics;
   final VoidCallback? onClearAll;
+  final bool hovered;
 
-  const _TopicsRow({required this.topics, this.onClearAll});
+  const _TopicsRow({
+    required this.topics,
+    this.onClearAll,
+    this.hovered = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +172,7 @@ class _TopicsRow extends StatelessWidget {
             ),
           );
         }),
-        if (onClearAll != null)
+        if (onClearAll != null && hovered)
           GestureDetector(
             onTap: onClearAll,
             child: Tooltip(
@@ -153,13 +180,13 @@ class _TopicsRow extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
+                  color: colorScheme.errorContainer,
                   borderRadius: BorderRadius.circular(AppRadius.xs),
                 ),
                 child: Icon(
                   Icons.close,
                   size: 12,
-                  color: colorScheme.outline,
+                  color: colorScheme.onErrorContainer,
                 ),
               ),
             ),

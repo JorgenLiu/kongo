@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
 import '../../models/contact.dart';
+import '../../utils/avatar_colors.dart';
 
 class ContactDetailHeader extends StatelessWidget {
   final Contact contact;
@@ -26,13 +27,24 @@ class ContactDetailHeader extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: colorScheme.primaryContainer,
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: AvatarColors.gradient(
+                  contact.name,
+                  brightness: Theme.of(context).brightness,
+                ),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
               child: Text(
                 identity,
                 style: TextStyle(
-                  color: colorScheme.onPrimaryContainer,
+                  color: AvatarColors.textColor(
+                    contact.name,
+                    brightness: Theme.of(context).brightness,
+                  ),
                   fontSize: AppFontSize.titleLarge,
                   fontWeight: FontWeight.bold,
                 ),

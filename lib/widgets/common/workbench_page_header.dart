@@ -26,9 +26,11 @@ class WorkbenchPageHeader extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.xs,
-        vertical: AppSpacing.sm,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.sm,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -40,19 +42,37 @@ class WorkbenchPageHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      eyebrow.toUpperCase(),
-                      style: textTheme.labelLarge?.copyWith(
-                        color: colorScheme.primary,
-                        letterSpacing: 0.9,
-                      ),
+                    // Eyebrow：主题色 + 宽字距，更强的版式信号
+                    Row(
+                      children: [
+                        Container(
+                          width: 3,
+                          height: 11,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Text(
+                          eyebrow.toUpperCase(),
+                          style: textTheme.labelLarge?.copyWith(
+                            color: colorScheme.primary.withValues(alpha: 0.75),
+                            letterSpacing: 1.6,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: 6),
+                    // Title：放大到 displaySmall 级别，更强的视觉锚点
                     Text(
                       title,
                       key: titleKey,
-                      style: textTheme.headlineSmall?.copyWith(
+                      style: textTheme.displaySmall?.copyWith(
                         fontWeight: FontWeight.w800,
+                        height: 1.1,
+                        letterSpacing: -0.3,
                       ),
                     ),
                     if (description != null && description!.isNotEmpty) ...[
@@ -62,7 +82,7 @@ class WorkbenchPageHeader extends StatelessWidget {
                         child: Text(
                           description!,
                           style: textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.outline,
+                            color: colorScheme.onSurface.withValues(alpha: 0.55),
                           ),
                         ),
                       ),

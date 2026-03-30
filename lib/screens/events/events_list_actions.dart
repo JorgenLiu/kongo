@@ -23,10 +23,11 @@ Future<bool> createScheduleFromList(
   DateTime? initialStartAt,
 }) async {
   final draft = await Navigator.of(context).push<EventDraft>(
-    SlidePageRoute(
+    SideSheetPageRoute(
       builder: (_) => EventFormScreen(
         suggestedContactId: suggestedContactId,
         initialStartAt: initialStartAt,
+        sideSheet: true,
       ),
     ),
   );

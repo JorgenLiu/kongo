@@ -380,6 +380,7 @@ class _SelectedParticipantCard extends StatelessWidget {
                 const SizedBox(height: AppSpacing.sm),
                 DropdownButtonFormField<String>(
                   key: Key('eventForm_participantRole_${contact.id}'),
+                  isExpanded: true,
                   initialValue: EventParticipantRoles.normalize(role),
                   decoration: const InputDecoration(
                     labelText: '关系角色',

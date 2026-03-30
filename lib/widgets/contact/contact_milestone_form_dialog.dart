@@ -80,6 +80,7 @@ class _MilestoneFormDialogState extends State<_MilestoneFormDialog> {
             children: [
               // 类型选择
               DropdownButtonFormField<ContactMilestoneType>(
+                isExpanded: true,
                 initialValue: _type,
                 decoration: const InputDecoration(labelText: '类型'),
                 items: ContactMilestoneType.values
@@ -155,6 +156,7 @@ class _MilestoneFormDialogState extends State<_MilestoneFormDialog> {
               if (_reminderEnabled) ...[
                 const SizedBox(height: AppSpacing.sm),
                 DropdownButtonFormField<int>(
+                  isExpanded: true,
                   initialValue: _reminderDaysBefore,
                   decoration: const InputDecoration(labelText: '提前提醒天数'),
                   items: kMilestoneReminderDayOptions

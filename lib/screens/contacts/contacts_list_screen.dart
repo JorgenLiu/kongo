@@ -9,7 +9,6 @@ import '../../utils/contact_indexing.dart';
 import '../../utils/input_debouncer.dart';
 import '../../widgets/common/workbench_page_header.dart';
 import '../../widgets/contact/contact_alphabet_index_bar.dart';
-import '../../widgets/contact/contact_active_tag_filters.dart';
 import '../../widgets/contact/contact_group_section.dart';
 import '../../widgets/contact/contact_header_tags_bar.dart';
 import '../../widgets/contact/contact_upcoming_milestones_card.dart';
@@ -124,7 +123,7 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            FilledButton.tonalIcon(
+            OutlinedButton.icon(
               onPressed: () => openTagManagementFromList(context),
               icon: const Icon(Icons.label_outline),
               label: const Text('分组管理'),
@@ -222,23 +221,20 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
             ),
           ),
         ),
-        if (selectedTags.isNotEmpty)
-          ContactActiveTagFilters(
-            selectedTags: selectedTags,
-            onOpenFilter: () => openTagFilterFromList(context),
-            onClear: _clearSearchAndFilters,
-          ),
         if (contactProvider.keyword.trim().isEmpty && selectedTags.isEmpty) ...[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              0,
-              AppSpacing.md,
-              AppSpacing.sm,
-            ),
-            child: ContactUpcomingMilestonesCard(
-              items: contactProvider.upcomingMilestones,
-              onContactTap: _openContactDetail,
+          LimitedBox(
+            maxHeight: 300,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                0,
+                AppSpacing.md,
+                AppSpacing.sm,
+              ),
+              child: ContactUpcomingMilestonesCard(
+                items: contactProvider.upcomingMilestones,
+                onContactTap: _openContactDetail,
+              ),
             ),
           ),
           const Divider(height: 1, indent: AppSpacing.md, endIndent: AppSpacing.md),

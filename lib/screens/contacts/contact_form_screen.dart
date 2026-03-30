@@ -9,16 +9,19 @@ import '../../providers/tag_provider.dart';
 import '../../utils/form_input_validators.dart';
 import '../../utils/unsaved_changes_guard.dart';
 import '../../widgets/contact/contact_form_tags_section.dart';
+import '../../widgets/common/side_sheet_scaffold.dart';
 import 'contact_form_actions.dart';
 
 class ContactFormScreen extends StatefulWidget {
   final Contact? initialContact;
   final String? initialName;
+  final bool sideSheet;
 
   const ContactFormScreen({
     super.key,
     this.initialContact,
     this.initialName,
+    this.sideSheet = false,
   });
 
   bool get isEditing => initialContact != null;
@@ -74,22 +77,28 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
   Widget build(BuildContext context) {
     final title = widget.isEditing ? '编辑联系人' : '新建联系人';
 
+    if (widget.sideSheet) {
+      return PopScope(
+        canPop: _allowPop || !_hasUnsavedChanges,
+        child: SideSheetScaffold(
+          title: title,
+          onClose: _handleClose,
+          action: FilledButton.tonal(
+            onPressed: _isSaving ? null : _submit,
+            child: const Text('保存'),
+          ),
+          body: _buildFormBody(),
+        ),
+      );
+    }
+
     return PopScope(
       canPop: _allowPop || !_hasUnsavedChanges,
       child: Scaffold(
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
-            onPressed: () async {
-              if (_allowPop || !_hasUnsavedChanges) {
-                Navigator.of(context).pop();
-                return;
-              }
-              final shouldDiscard = await showDiscardChangesDialog(context);
-              if (shouldDiscard && context.mounted) {
-                Navigator.of(context).pop();
-              }
-            },
+            onPressed: _handleClose,
           ),
           title: Text(title),
           actions: [
@@ -102,119 +111,135 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
             ),
           ],
         ),
-        body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: AppDimensions.formMaxWidth),
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        key: const Key('contactForm_nameField'),
-                        controller: _nameController,
-                        maxLength: FormFieldLimits.contactName,
-                        decoration: const InputDecoration(
-                          labelText: '姓名',
-                          hintText: '请输入联系人姓名',
-                        ),
-                        textInputAction: TextInputAction.next,
-                        validator: (value) => FormInputValidators.requiredText(
-                          value,
-                          fieldName: '姓名',
-                          maxLength: FormFieldLimits.contactName,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        key: const Key('contactForm_phoneField'),
-                        controller: _phoneController,
-                        maxLength: FormFieldLimits.phone,
-                        decoration: const InputDecoration(
-                          labelText: '电话',
-                          hintText: '请输入联系电话',
-                        ),
-                        keyboardType: TextInputType.phone,
-                        textInputAction: TextInputAction.next,
-                        validator: FormInputValidators.phone,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        key: const Key('contactForm_emailField'),
-                        controller: _emailController,
-                        maxLength: FormFieldLimits.email,
-                        decoration: const InputDecoration(
-                          labelText: '邮箱',
-                          hintText: '请输入邮箱地址',
-                        ),
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        validator: FormInputValidators.email,
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        key: const Key('contactForm_addressField'),
-                        controller: _addressController,
-                        maxLength: FormFieldLimits.address,
-                        decoration: const InputDecoration(
-                          labelText: '地址',
-                          hintText: '请输入地址',
-                        ),
-                        textInputAction: TextInputAction.next,
-                        validator: (value) => FormInputValidators.optionalText(
-                          value,
-                          fieldName: '地址',
-                          maxLength: FormFieldLimits.address,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.md),
-                      TextFormField(
-                        key: const Key('contactForm_notesField'),
-                        controller: _notesController,
-                        maxLength: FormFieldLimits.notes,
-                        decoration: const InputDecoration(
-                          labelText: '备注',
-                          hintText: '补充说明、关系背景或跟进信息',
-                          alignLabelWithHint: true,
-                        ),
-                        maxLines: 5,
-                        minLines: 3,
-                        validator: (value) => FormInputValidators.optionalText(
-                          value,
-                          fieldName: '备注',
-                          maxLength: FormFieldLimits.notes,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      Consumer<TagProvider>(
-                        builder: (context, tagProvider, child) {
-                          return ContactFormTagsSection(
-                            tags: tagProvider.tags,
-                            selectedTagIds: _selectedTagIds,
-                            loading: tagProvider.loading,
-                            onManageTagsTap: _openTagManagement,
-                            onTagToggle: _toggleTag,
-                          );
-                        },
-                      ),
-                      const SizedBox(height: AppSpacing.lg),
-                      FilledButton(
-                        key: const Key('contactForm_submitButton'),
-                        onPressed: _isSaving ? null : _submit,
-                        child: _isSaving
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(widget.isEditing ? '保存修改' : '创建联系人'),
-                      ),
-                    ],
+        body: _buildFormBody(),
+      ),
+    );
+  }
+
+  Future<void> _handleClose() async {
+    final navigator = Navigator.of(context);
+    if (_allowPop || !_hasUnsavedChanges) {
+      navigator.pop();
+      return;
+    }
+    final shouldDiscard = await showDiscardChangesDialog(context);
+    if (shouldDiscard && context.mounted) {
+      navigator.pop();
+    }
+  }
+
+  Widget _buildFormBody() {
+    return SafeArea(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AppDimensions.formMaxWidth),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    key: const Key('contactForm_nameField'),
+                    controller: _nameController,
+                    maxLength: FormFieldLimits.contactName,
+                    decoration: const InputDecoration(
+                      labelText: '姓名',
+                      hintText: '请输入联系人姓名',
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (value) => FormInputValidators.requiredText(
+                      value,
+                      fieldName: '姓名',
+                      maxLength: FormFieldLimits.contactName,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    key: const Key('contactForm_phoneField'),
+                    controller: _phoneController,
+                    maxLength: FormFieldLimits.phone,
+                    decoration: const InputDecoration(
+                      labelText: '电话',
+                      hintText: '请输入联系电话',
+                    ),
+                    keyboardType: TextInputType.phone,
+                    textInputAction: TextInputAction.next,
+                    validator: FormInputValidators.phone,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    key: const Key('contactForm_emailField'),
+                    controller: _emailController,
+                    maxLength: FormFieldLimits.email,
+                    decoration: const InputDecoration(
+                      labelText: '邮箱',
+                      hintText: '请输入邮箱地址',
+                    ),
+                    keyboardType: TextInputType.emailAddress,
+                    textInputAction: TextInputAction.next,
+                    validator: FormInputValidators.email,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    key: const Key('contactForm_addressField'),
+                    controller: _addressController,
+                    maxLength: FormFieldLimits.address,
+                    decoration: const InputDecoration(
+                      labelText: '地址',
+                      hintText: '请输入地址',
+                    ),
+                    textInputAction: TextInputAction.next,
+                    validator: (value) => FormInputValidators.optionalText(
+                      value,
+                      fieldName: '地址',
+                      maxLength: FormFieldLimits.address,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  TextFormField(
+                    key: const Key('contactForm_notesField'),
+                    controller: _notesController,
+                    maxLength: FormFieldLimits.notes,
+                    decoration: const InputDecoration(
+                      labelText: '备注',
+                      hintText: '补充说明、关系背景或跟进信息',
+                      alignLabelWithHint: true,
+                    ),
+                    maxLines: 5,
+                    minLines: 3,
+                    validator: (value) => FormInputValidators.optionalText(
+                      value,
+                      fieldName: '备注',
+                      maxLength: FormFieldLimits.notes,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Consumer<TagProvider>(
+                    builder: (context, tagProvider, child) {
+                      return ContactFormTagsSection(
+                        tags: tagProvider.tags,
+                        selectedTagIds: _selectedTagIds,
+                        loading: tagProvider.loading,
+                        onManageTagsTap: _openTagManagement,
+                        onTagToggle: _toggleTag,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  FilledButton(
+                    key: const Key('contactForm_submitButton'),
+                    onPressed: _isSaving ? null : _submit,
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(widget.isEditing ? '保存修改' : '创建联系人'),
+                  ),
+                ],
               ),
             ),
           ),

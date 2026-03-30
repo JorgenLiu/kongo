@@ -32,8 +32,11 @@ Future<Contact?> quickCreateTodoContact(
   String? initialName,
 }) async {
   final draft = await Navigator.of(context).push<ContactDraft>(
-    SlidePageRoute(
-      builder: (_) => ContactFormScreen(initialName: _normalizePrefill(initialName)),
+    SideSheetPageRoute(
+      builder: (_) => ContactFormScreen(
+        initialName: _normalizePrefill(initialName),
+        sideSheet: true,
+      ),
     ),
   );
 
@@ -62,11 +65,12 @@ Future<Event?> quickCreateTodoEvent(
       contactId: EventParticipantRoles.participant,
   };
   final draft = await Navigator.of(context).push<EventDraft>(
-    SlidePageRoute(
+    SideSheetPageRoute(
       builder: (_) => EventFormScreen(
         initialTitle: _normalizePrefill(initialTitle),
         suggestedContactId: normalizedParticipantIds.isEmpty ? null : normalizedParticipantIds.first,
         initialParticipantRoles: initialParticipantRoles,
+        sideSheet: true,
       ),
     ),
   );

@@ -152,9 +152,7 @@ class _DesktopShellLayoutState extends State<DesktopShellLayout> {
                 ),
                 decoration: BoxDecoration(
                   color: colorScheme.surfaceContainerLow,
-                  border: Border(
-                    right: BorderSide(color: colorScheme.outlineVariant),
-                  ),
+                  // 不使用右侧描边——利用侧栏与主内容区的纯色深度差产生空间感
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,

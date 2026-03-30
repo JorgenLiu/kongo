@@ -33,10 +33,11 @@ Future<void> editEventDetail(
   required Map<String, String> participantRoles,
 }) async {
   final draft = await Navigator.of(context).push<EventDraft>(
-    SlidePageRoute(
+    SideSheetPageRoute(
       builder: (_) => EventFormScreen(
         initialEvent: event,
         initialParticipantRoles: participantRoles,
+        sideSheet: true,
       ),
     ),
   );

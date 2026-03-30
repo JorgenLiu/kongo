@@ -31,7 +31,14 @@ class ContactDetailTagsSection extends StatelessWidget {
                   .map(
                     (tag) => Chip(
                       label: Text(tag.name),
-                      backgroundColor: colorScheme.primaryContainer,
+                      // 果冻感：主题色透明叠加，无边框
+                      backgroundColor: colorScheme.primary.withValues(alpha: 0.12),
+                      side: BorderSide.none,
+                      labelStyle: TextStyle(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: AppFontSize.bodySmall,
+                      ),
                     ),
                   )
                   .toList(),

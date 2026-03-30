@@ -49,8 +49,8 @@ Future<void> openRelatedEventDetail(BuildContext context, String eventId) async 
 
 Future<void> editContactDetail(BuildContext context, Contact contact) async {
   final draft = await Navigator.of(context).push<ContactDraft>(
-    SlidePageRoute(
-      builder: (_) => ContactFormScreen(initialContact: contact),
+    SideSheetPageRoute(
+      builder: (_) => ContactFormScreen(initialContact: contact, sideSheet: true),
     ),
   );
 

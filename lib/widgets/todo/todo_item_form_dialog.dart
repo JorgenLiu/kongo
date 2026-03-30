@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
+import '../../config/page_transitions.dart';
 import '../../models/contact.dart';
 import '../../models/event.dart';
 import '../../models/tag.dart';
 import '../../models/todo_item.dart';
 import '../../models/todo_item_draft.dart';
 import '../../utils/form_input_validators.dart';
+import '../common/side_sheet_scaffold.dart';
 import 'todo_contact_selection_section.dart';
 import 'todo_event_selection_section.dart';
 
@@ -28,23 +30,24 @@ Future<TodoItemDraft?> showTodoItemFormDialog(
   TodoCreateContactCallback? onCreateContact,
   TodoCreateEventCallback? onCreateEvent,
 }) async {
-  return showDialog<TodoItemDraft>(
-    context: context,
-    builder: (context) => _TodoItemFormDialog(
-      initialItem: initialItem,
-      initialTitle: initialTitle,
-      availableContacts: availableContacts,
-      availableEvents: availableEvents,
-      availableTags: availableTags,
-      initialContactIds: initialContactIds,
-      initialEventIds: initialEventIds,
-      onCreateContact: onCreateContact,
-      onCreateEvent: onCreateEvent,
+  return Navigator.of(context).push<TodoItemDraft>(
+    SideSheetPageRoute(
+      builder: (_) => _TodoItemFormSheet(
+        initialItem: initialItem,
+        initialTitle: initialTitle,
+        availableContacts: availableContacts,
+        availableEvents: availableEvents,
+        availableTags: availableTags,
+        initialContactIds: initialContactIds,
+        initialEventIds: initialEventIds,
+        onCreateContact: onCreateContact,
+        onCreateEvent: onCreateEvent,
+      ),
     ),
   );
 }
 
-class _TodoItemFormDialog extends StatefulWidget {
+class _TodoItemFormSheet extends StatefulWidget {
   final TodoItem? initialItem;
   final String? initialTitle;
   final List<Contact> availableContacts;
@@ -55,7 +58,7 @@ class _TodoItemFormDialog extends StatefulWidget {
   final TodoCreateContactCallback? onCreateContact;
   final TodoCreateEventCallback? onCreateEvent;
 
-  const _TodoItemFormDialog({
+  const _TodoItemFormSheet({
     required this.initialItem,
     required this.initialTitle,
     required this.availableContacts,
@@ -68,10 +71,10 @@ class _TodoItemFormDialog extends StatefulWidget {
   });
 
   @override
-  State<_TodoItemFormDialog> createState() => _TodoItemFormDialogState();
+  State<_TodoItemFormSheet> createState() => _TodoItemFormSheetState();
 }
 
-class _TodoItemFormDialogState extends State<_TodoItemFormDialog> {
+class _TodoItemFormSheetState extends State<_TodoItemFormSheet> {
   late final TextEditingController _titleController;
   late final TextEditingController _notesController;
   late final Set<String> _selectedContactIds;
@@ -104,111 +107,105 @@ class _TodoItemFormDialogState extends State<_TodoItemFormDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.initialItem == null ? '新建待办项' : '编辑待办项'),
-      content: SizedBox(
-        width: 560,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  controller: _titleController,
-                  autofocus: true,
+    final isNew = widget.initialItem == null;
+    return SideSheetScaffold(
+      title: isNew ? '新建待办项' : '编辑待办项',
+      onClose: () => Navigator.of(context).pop(),
+      action: FilledButton(
+        onPressed: _submit,
+        child: const Text('保存'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _titleController,
+                autofocus: true,
+                maxLength: FormFieldLimits.todoItemTitle,
+                decoration: const InputDecoration(
+                  labelText: '待办项标题',
+                  hintText: '例如：确认报价方案 / 联系渠道负责人',
+                ),
+                validator: (value) => FormInputValidators.requiredText(
+                  value,
+                  fieldName: '待办项标题',
                   maxLength: FormFieldLimits.todoItemTitle,
-                  decoration: const InputDecoration(
-                    labelText: '待办项标题',
-                    hintText: '例如：确认报价方案 / 联系渠道负责人',
-                  ),
-                  validator: (value) => FormInputValidators.requiredText(
-                    value,
-                    fieldName: '待办项标题',
-                    maxLength: FormFieldLimits.todoItemTitle,
-                  ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                TextFormField(
-                  controller: _notesController,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: '备注',
-                    hintText: '可选：补充执行说明',
-                  ),
-                  validator: (value) => FormInputValidators.optionalText(
-                    value,
-                    fieldName: '备注',
-                    maxLength: FormFieldLimits.notes,
-                  ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextFormField(
+                controller: _notesController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: '备注',
+                  hintText: '可选：补充执行说明',
                 ),
-                const SizedBox(height: AppSpacing.md),
-                SegmentedButton<TodoItemStatus>(
-                  segments: const [
-                    ButtonSegment(value: TodoItemStatus.pending, label: Text('待处理')),
-                    ButtonSegment(value: TodoItemStatus.completed, label: Text('已完成')),
-                  ],
-                  selected: {_status},
-                  onSelectionChanged: (selection) {
-                    setState(() {
-                      _status = selection.first;
-                    });
-                  },
+                validator: (value) => FormInputValidators.optionalText(
+                  value,
+                  fieldName: '备注',
+                  maxLength: FormFieldLimits.notes,
                 ),
-                const SizedBox(height: AppSpacing.md),
-                TodoContactSelectionSection(
-                  contacts: _availableContacts,
-                  tags: widget.availableTags,
-                  selectedIds: _selectedContactIds,
-                  creating: _creatingContact,
-                  onQuickCreate: widget.onCreateContact == null
-                      ? null
-                      : _handleCreateContact,
-                  onChanged: (id, selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedContactIds.add(id);
-                      } else {
-                        _selectedContactIds.remove(id);
-                      }
-                    });
-                  },
-                ),
-                const SizedBox(height: AppSpacing.md),
-                TodoEventSelectionSection(
-                  events: _availableEvents,
-                  selectedIds: _selectedEventIds,
-                  selectedContactIds: _selectedContactIds.toList(growable: false),
-                  creating: _creatingEvent,
-                  onQuickCreate: widget.onCreateEvent == null
-                      ? null
-                      : _handleCreateEvent,
-                  onChanged: (id, selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedEventIds.add(id);
-                      } else {
-                        _selectedEventIds.remove(id);
-                      }
-                    });
-                  },
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              SegmentedButton<TodoItemStatus>(
+                segments: const [
+                  ButtonSegment(value: TodoItemStatus.pending, label: Text('待处理')),
+                  ButtonSegment(value: TodoItemStatus.completed, label: Text('已完成')),
+                ],
+                selected: {_status},
+                onSelectionChanged: (selection) {
+                  setState(() {
+                    _status = selection.first;
+                  });
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TodoContactSelectionSection(
+                contacts: _availableContacts,
+                tags: widget.availableTags,
+                selectedIds: _selectedContactIds,
+                creating: _creatingContact,
+                onQuickCreate: widget.onCreateContact == null
+                    ? null
+                    : _handleCreateContact,
+                onChanged: (id, selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedContactIds.add(id);
+                    } else {
+                      _selectedContactIds.remove(id);
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TodoEventSelectionSection(
+                events: _availableEvents,
+                selectedIds: _selectedEventIds,
+                selectedContactIds: _selectedContactIds.toList(growable: false),
+                creating: _creatingEvent,
+                onQuickCreate: widget.onCreateEvent == null
+                    ? null
+                    : _handleCreateEvent,
+                onChanged: (id, selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedEventIds.add(id);
+                    } else {
+                      _selectedEventIds.remove(id);
+                    }
+                  });
+                },
+              ),
+            ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('保存'),
-        ),
-      ],
     );
   }
 

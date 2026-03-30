@@ -60,6 +60,7 @@ class EventFormBasicSection extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String?>(
               key: const Key('eventForm_eventTypeField'),
+              isExpanded: true,
               initialValue: selectedEventTypeId,
               decoration: const InputDecoration(labelText: '事件类型'),
               items: [
@@ -79,6 +80,7 @@ class EventFormBasicSection extends StatelessWidget {
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<String?>(
               key: const Key('eventForm_createdByField'),
+              isExpanded: true,
               initialValue: selectedCreatedByContactId,
               decoration: const InputDecoration(labelText: '创建人'),
               items: [

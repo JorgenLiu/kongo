@@ -71,6 +71,9 @@ class AppDimensions {
   /// 表单最大宽度（联系人/事件/总结统一）
   static const double formMaxWidth = 780;
 
+  /// Side Sheet 抽屉面板宽度
+  static const double sideSheetWidth = 520;
+
   /// 联系人头像尺寸
   static const double contactAvatarSize = 52;
 

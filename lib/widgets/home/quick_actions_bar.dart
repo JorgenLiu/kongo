@@ -20,12 +20,12 @@ class QuickActionsBar extends StatelessWidget {
       runSpacing: AppSpacing.sm,
       alignment: WrapAlignment.end,
       children: [
-        OutlinedButton.icon(
+        FilledButton.icon(
           onPressed: onCreateContact,
           icon: const Icon(Icons.person_add_outlined, size: 18),
           label: const Text('新建联系人'),
         ),
-        OutlinedButton.icon(
+        FilledButton.icon(
           onPressed: onCreateEvent,
           icon: const Icon(Icons.event_outlined, size: 18),
           label: const Text('新建事件'),

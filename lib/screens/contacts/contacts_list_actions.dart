@@ -16,8 +16,8 @@ import 'contact_form_screen.dart';
 
 Future<void> createContactFromList(BuildContext context) async {
   final draft = await Navigator.of(context).push<ContactDraft>(
-    SlidePageRoute(
-      builder: (_) => const ContactFormScreen(),
+    SideSheetPageRoute(
+      builder: (_) => const ContactFormScreen(sideSheet: true),
     ),
   );
 
@@ -41,8 +41,8 @@ Future<void> createContactFromList(BuildContext context) async {
 
 Future<void> editContactFromList(BuildContext context, Contact contact) async {
   final draft = await Navigator.of(context).push<ContactDraft>(
-    SlidePageRoute(
-      builder: (_) => ContactFormScreen(initialContact: contact),
+    SideSheetPageRoute(
+      builder: (_) => ContactFormScreen(initialContact: contact, sideSheet: true),
     ),
   );
 

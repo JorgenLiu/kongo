@@ -6,7 +6,7 @@ import '../../models/contact_upcoming_milestone.dart';
 import '../../utils/display_formatters.dart';
 import '../common/section_card.dart';
 
-class ContactUpcomingMilestonesCard extends StatelessWidget {
+class ContactUpcomingMilestonesCard extends StatefulWidget {
   final List<ContactUpcomingMilestone> items;
   final ValueChanged<Contact> onContactTap;
 
@@ -17,13 +17,26 @@ class ContactUpcomingMilestonesCard extends StatelessWidget {
   });
 
   @override
+  State<ContactUpcomingMilestonesCard> createState() =>
+      _ContactUpcomingMilestonesCardState();
+}
+
+class _ContactUpcomingMilestonesCardState
+    extends State<ContactUpcomingMilestonesCard> {
+  static const int _collapsedCount = 3;
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
-    final visibleItems = items.take(5).toList(growable: false);
+    final hasMore = widget.items.length > _collapsedCount;
+    final visibleItems = _expanded
+        ? widget.items
+        : widget.items.take(_collapsedCount).toList(growable: false);
 
     return SectionCard(
       icon: Icons.celebration_outlined,
       title: '即将到来的重要日期',
-      child: items.isEmpty
+      child: widget.items.isEmpty
           ? Text(
               '未来 30 天内暂无重要日期。',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
@@ -36,18 +49,22 @@ class ContactUpcomingMilestonesCard extends StatelessWidget {
                 for (var index = 0; index < visibleItems.length; index++) ...[
                   _UpcomingMilestoneRow(
                     item: visibleItems[index],
-                    onTap: () => onContactTap(visibleItems[index].contact),
+                    onTap: () => widget.onContactTap(visibleItems[index].contact),
                   ),
                   if (index < visibleItems.length - 1)
                     const Divider(height: AppSpacing.sm),
                 ],
-                if (items.length > visibleItems.length) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    '还有 ${items.length - visibleItems.length} 条重要日期未展开显示。',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.outline,
-                        ),
+                if (hasMore) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => setState(() => _expanded = !_expanded),
+                      child: Text(
+                        _expanded
+                            ? '收起'
+                            : '展开全部（${widget.items.length} 条）',
+                      ),
+                    ),
                   ),
                 ],
               ],

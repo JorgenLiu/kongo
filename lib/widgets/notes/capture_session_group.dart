@@ -5,8 +5,10 @@ import '../../models/quick_note.dart';
 import '../../services/read/notes_read_service.dart';
 import 'note_card.dart';
 
-/// 一个会话分组：展示时间范围标题 + 可展开/收起的笔记列表。
-class CaptureSessionGroup extends StatefulWidget {
+/// 一个会话分组的时间轴视图：左侧时间锚点 + 渐变竖线 + 笔记内容流。
+///
+/// 取消了折叠交互，改为始终展开的 Timeline 范式。
+class CaptureSessionGroup extends StatelessWidget {
   final CaptureSession session;
 
   /// contactId → contactName 映射，用于渲染关联联系人姓名。
@@ -27,102 +29,123 @@ class CaptureSessionGroup extends StatefulWidget {
   });
 
   @override
-  State<CaptureSessionGroup> createState() => _CaptureSessionGroupState();
-}
-
-class _CaptureSessionGroupState extends State<CaptureSessionGroup> {
-  bool _expanded = true;
-
-  CaptureSession get _session => widget.session;
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _expanded = !_expanded),
-          borderRadius: BorderRadius.circular(AppRadius.sm),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.sm,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  _expanded ? Icons.expand_less : Icons.expand_more,
-                  size: 16,
-                  color: colorScheme.outline,
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  _buildSessionHeader(),
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: colorScheme.outline,
-                    fontWeight: FontWeight.w600,
+    final sessionLabel = _sessionLabel();
+
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: AppSpacing.md,
+        right: AppSpacing.md,
+        bottom: AppSpacing.lg,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── 时间段标题行 ──
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 时间标签（固定宽度，右对齐）
+              SizedBox(
+                width: 42,
+                child: Text(
+                  _formatTime(session.startAt),
+                  textAlign: TextAlign.right,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colorScheme.onSurface.withValues(alpha: 0.35),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    letterSpacing: 0.3,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                if (_sessionLabel() != null) ...[
-                  _SessionLabelChip(label: _sessionLabel()!),
-                  const SizedBox(width: AppSpacing.sm),
-                ],
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sm,
-                    vertical: 1,
-                  ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              // 横向延伸的分隔线
+              Expanded(
+                child: Container(
+                  height: 1,
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(AppRadius.xs),
-                  ),
-                  child: Text(
-                    '${_session.notes.length} 条',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.outline,
+                    gradient: LinearGradient(
+                      colors: [
+                        colorScheme.onSurface.withValues(alpha: 0.10),
+                        colorScheme.onSurface.withValues(alpha: 0.02),
+                      ],
                     ),
+                  ),
+                ),
+              ),
+              if (sessionLabel != null) ...[
+                const SizedBox(width: AppSpacing.sm),
+                _SessionLabelChip(label: sessionLabel),
+              ],
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xs),
+
+          // ── 时间轴主体：竖线 + 笔记 ──
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 左侧占位（与时间标签对齐）
+                const SizedBox(width: 42),
+                const SizedBox(width: AppSpacing.sm),
+                // 渐变竖线 — 主题色从上到下淡出
+                Container(
+                  width: 2,
+                  margin: const EdgeInsets.symmetric(vertical: 2),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        colorScheme.primary.withValues(alpha: 0.45),
+                        colorScheme.primary.withValues(alpha: 0.06),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                // 笔记内容列
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: session.notes
+                        .map(
+                          (note) => NoteCard(
+                            note: note,
+                            linkedContactName: _contactName(note),
+                            onDelete: onDeleteNote != null
+                                ? () => onDeleteNote!(note.id)
+                                : null,
+                            onClearTopics: onClearTopics != null
+                                ? () => onClearTopics!(note.id)
+                                : null,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-        if (_expanded)
-          ...widget.session.notes.map((note) => NoteCard(
-                note: note,
-                linkedContactName: _contactName(note),
-                onDelete: widget.onDeleteNote != null
-                    ? () => widget.onDeleteNote!(note.id)
-                    : null,
-                onClearTopics: widget.onClearTopics != null
-                    ? () => widget.onClearTopics!(note.id)
-                    : null,
-              )),
-      ],
+        ],
+      ),
     );
-  }
-
-  String _buildSessionHeader() {
-    final start = _formatTime(_session.startAt);
-    if (_session.notes.length == 1) {
-      return start;
-    }
-    final end = _formatTime(_session.endAt);
-    return '$start – $end';
   }
 
   String? _contactName(QuickNote note) {
     if (note.linkedContactId == null) return null;
-    return widget.contactNames[note.linkedContactId];
+    return contactNames[note.linkedContactId];
   }
 
   /// 从会话内任意笔记的 aiMetadata 中取 sessionLabel（取第一个非 null 值）。
   String? _sessionLabel() {
-    for (final note in _session.notes) {
+    for (final note in session.notes) {
       final label = note.aiMetadata?['sessionLabel'];
       if (label is String && label.isNotEmpty) return label;
     }
@@ -147,16 +170,18 @@ class _SessionLabelChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
-        vertical: 1,
+        vertical: 2,
       ),
       decoration: BoxDecoration(
-        color: colorScheme.tertiaryContainer,
+        // 果冻感：主题色极低不透明度背景
+        color: colorScheme.primary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppRadius.xs),
       ),
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: colorScheme.onTertiaryContainer,
+          color: colorScheme.primary.withValues(alpha: 0.85),
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

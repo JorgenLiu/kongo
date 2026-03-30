@@ -33,6 +33,7 @@ class EventListItemCard extends StatefulWidget {
 
 class _EventListItemCardState extends State<EventListItemCard> {
   bool _hovering = false;
+  bool _pressing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -53,20 +54,29 @@ class _EventListItemCardState extends State<EventListItemCard> {
       button: true,
       child: MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
+      onExit: (_) => setState(() { _hovering = false; _pressing = false; }),
+      child: AnimatedScale(
+      scale: _pressing ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.easeOutCubic,
       child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOutCubic,
+      transform: Matrix4.translationValues(0, (_hovering && !_pressing) ? -2.0 : 0.0, 0),
+      transformAlignment: Alignment.center,
       child: Card(
-      elevation: _hovering ? 2 : null,
+      elevation: _hovering ? 4 : null,
       child: GestureDetector(
         onSecondaryTapDown: hasActions
             ? (details) => _showContextMenu(context, details.globalPosition)
             : null,
+        onTapDown: widget.onTap != null ? (_) => setState(() => _pressing = true) : null,
+        onTapUp: (_) => setState(() => _pressing = false),
+        onTapCancel: () => setState(() => _pressing = false),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           onTap: widget.onTap,
-          hoverColor: colorScheme.primary.withValues(alpha: 0.12),
+          hoverColor: Colors.transparent,
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
@@ -186,6 +196,7 @@ class _EventListItemCardState extends State<EventListItemCard> {
           ),
         ),
       ),
+    ),
     ),
     ),
     ),

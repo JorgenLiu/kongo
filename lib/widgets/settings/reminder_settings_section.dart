@@ -123,6 +123,7 @@ class ReminderSettingsSection extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               DropdownButtonFormField<ReminderDefaultOffset>(
+                isExpanded: true,
                 initialValue: settings.eventDefaultOffset,
                 decoration: const InputDecoration(labelText: '新建事件默认提醒'),
                 items: ReminderDefaultOffset.values
@@ -143,6 +144,7 @@ class ReminderSettingsSection extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               DropdownButtonFormField<int>(
+                isExpanded: true,
                 initialValue: settings.milestoneDefaultReminderDaysBefore,
                 decoration: const InputDecoration(labelText: '新建重要日期默认提醒'),
                 items: kMilestoneReminderDayOptions

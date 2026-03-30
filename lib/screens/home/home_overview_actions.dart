@@ -47,7 +47,7 @@ Future<void> openContactDetailFromHome(
 
 Future<void> createContactFromHome(BuildContext context) async {
   await Navigator.of(context).push<void>(
-    SlidePageRoute(builder: (_) => const ContactFormScreen()),
+    SideSheetPageRoute(builder: (_) => const ContactFormScreen(sideSheet: true)),
   );
 }
 
@@ -66,8 +66,8 @@ Future<bool> createEventFromHomeWithInitialStart(
   DateTime? initialStartAt,
 }) async {
   final draft = await Navigator.of(context).push<EventDraft>(
-    SlidePageRoute(
-      builder: (_) => EventFormScreen(initialStartAt: initialStartAt),
+    SideSheetPageRoute(
+      builder: (_) => EventFormScreen(initialStartAt: initialStartAt, sideSheet: true),
     ),
   );
   if (draft == null || !context.mounted) return false;

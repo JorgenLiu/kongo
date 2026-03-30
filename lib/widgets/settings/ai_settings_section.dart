@@ -102,6 +102,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
             const SizedBox(height: AppSpacing.md),
             DropdownButtonFormField<AiPresetProvider>(
               key: const Key('aiSettingsProviderField'),
+              isExpanded: true,
               initialValue: _selectedPreset,
               decoration: const InputDecoration(
                 labelText: '服务提供商',

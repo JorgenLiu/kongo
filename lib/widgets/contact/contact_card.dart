@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
 import '../../models/contact.dart';
+import '../../utils/avatar_colors.dart';
 
 /// 联系人列表项卡片
 class ContactCard extends StatefulWidget {
@@ -27,6 +28,7 @@ class ContactCard extends StatefulWidget {
 class _ContactCardState extends State<ContactCard> {
   static const double _actionSlotWidth = 76;
   bool _hovering = false;
+  bool _pressing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -41,21 +43,30 @@ class _ContactCardState extends State<ContactCard> {
       button: true,
       child: MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
+      onExit: (_) => setState(() { _hovering = false; _pressing = false; }),
+      child: AnimatedScale(
+      scale: _pressing ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.easeOutCubic,
       child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOutCubic,
+      transform: Matrix4.translationValues(0, (_hovering && !_pressing) ? -2.0 : 0.0, 0),
+      transformAlignment: Alignment.center,
       child: Card(
-      elevation: _hovering ? 2 : null,
+      elevation: _hovering ? 4 : null,
       color: widget.selected ? colorScheme.primaryContainer.withValues(alpha: AppOpacity.half) : null,
       child: GestureDetector(
         onSecondaryTapDown: hasActions
             ? (details) => _showContextMenu(context, details.globalPosition)
             : null,
+        onTapDown: widget.onTap != null ? (_) => setState(() => _pressing = true) : null,
+        onTapUp: (_) => setState(() => _pressing = false),
+        onTapCancel: () => setState(() => _pressing = false),
         child: InkWell(
           borderRadius: BorderRadius.circular(AppRadius.lg),
           onTap: widget.onTap,
-          hoverColor: colorScheme.primary.withValues(alpha: 0.12),
+          hoverColor: Colors.transparent,
           child: Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
@@ -167,6 +178,7 @@ class _ContactCardState extends State<ContactCard> {
     ),
     ),
     ),
+    ),
     );
   }
 
@@ -228,37 +240,39 @@ class _ContactCardState extends State<ContactCard> {
   }
 
   Widget _buildAvatar(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final brightness = Theme.of(context).brightness;
+    final name = widget.contact.name;
+    final gradient = AvatarColors.gradient(name, brightness: brightness);
+    final avatarTextColor = AvatarColors.textColor(name, brightness: brightness);
 
     return ExcludeSemantics(
       child: Container(
-      width: AppDimensions.contactAvatarSize,
-      height: AppDimensions.contactAvatarSize,
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.outlineVariant),
+        width: AppDimensions.contactAvatarSize,
+        height: AppDimensions.contactAvatarSize,
+        decoration: BoxDecoration(
+          gradient: widget.contact.avatar == null ? gradient : null,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+        ),
+        alignment: Alignment.center,
+        child: widget.contact.avatar != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                child: Image.network(
+                  widget.contact.avatar!,
+                  width: AppDimensions.contactAvatarSize,
+                  height: AppDimensions.contactAvatarSize,
+                  fit: BoxFit.cover,
+                ),
+              )
+            : Text(
+                name.isNotEmpty ? name[0].toUpperCase() : '?',
+                style: TextStyle(
+                  color: avatarTextColor,
+                  fontSize: AppFontSize.titleMedium,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
       ),
-      alignment: Alignment.center,
-      child: widget.contact.avatar != null
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(AppRadius.md - 2),
-              child: Image.network(
-                widget.contact.avatar!,
-                width: AppDimensions.contactAvatarSize,
-                height: AppDimensions.contactAvatarSize,
-                fit: BoxFit.cover,
-              ),
-            )
-          : Text(
-              widget.contact.name.isNotEmpty ? widget.contact.name[0].toUpperCase() : '?',
-              style: TextStyle(
-                color: colorScheme.onPrimaryContainer,
-                fontSize: AppFontSize.titleMedium,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-    ),
     );
   }
 
@@ -271,9 +285,9 @@ class _ContactCardState extends State<ContactCard> {
         vertical: AppSpacing.xs,
       ),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: AppOpacity.half),
+        // 果冻感：用主题色透明叠加，去除硬边框
+        color: colorScheme.primary.withValues(alpha: AppOpacity.subtle),
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Text(
         label,
@@ -281,7 +295,7 @@ class _ContactCardState extends State<ContactCard> {
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
           fontSize: AppFontSize.labelSmall,
-          color: colorScheme.onSurface,
+          color: colorScheme.primary.withValues(alpha: 0.85),
           fontWeight: FontWeight.w600,
         ),
       ),

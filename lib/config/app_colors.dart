@@ -21,13 +21,13 @@ class AppColors {
   static const Color cardBorder = Color(0xFFC5BDA8);
   static const Color accentSoft = Color(0xFFF2E2B3);
 
-  // Dark theme neutrals
-  static const Color backgroundDark = Color(0xFF13110F);
-  static const Color surfaceDark = Color(0xFF1A1714);
-  static const Color surfaceVariantDark = Color(0xFF28231D);
+  // Dark theme neutrals — 深色底盘，用空间代替边框
+  static const Color backgroundDark = Color(0xFF0E0C09);   // 更深的暖黑底色
+  static const Color surfaceDark = Color(0xFF1E1B17);       // 与背景拉开层次
+  static const Color surfaceVariantDark = Color(0xFF2D2820); // 进一步抬高的层级
   static const Color outlineDark = Color(0xFF7A7268);
-  static const Color onSurfaceDark = Color(0xFFF5EFE4);
+  static const Color onSurfaceDark = Color(0xFFEDE5D4);     // 暖白，减少刺眼感
   static const Color disabledDark = Color(0xFF6E6559);
-  static const Color cardBorderDark = Color(0xFF5A5040);
+  static const Color cardBorderDark = Color(0xFF2A2520);    // 极其克制，几乎不可见
   static const Color accentSoftDark = Color(0xFF382D13);
 }
