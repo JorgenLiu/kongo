@@ -31,11 +31,6 @@ class HomeDailyBriefExpandableItem extends StatelessWidget {
             ? colorScheme.surface.withValues(alpha: 0.22)
             : colorScheme.surface.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: expanded
-              ? colorScheme.primary.withValues(alpha: 0.3)
-              : colorScheme.onPrimaryContainer.withValues(alpha: 0.12),
-        ),
       ),
       child: Column(
         children: [

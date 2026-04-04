@@ -9,6 +9,7 @@ import '../../services/quick_capture_parser.dart';
 class NoteCard extends StatefulWidget {
   final QuickNote note;
   final String? linkedContactName;
+  final String? linkedEventTitle;
 
   /// 调用方处理删除（软删除整条笔记）。
   final VoidCallback? onDelete;
@@ -16,12 +17,21 @@ class NoteCard extends StatefulWidget {
   /// 调用方处理清除 AI topics。
   final VoidCallback? onClearTopics;
 
+  /// 点击联系人 chip 的回调。
+  final VoidCallback? onContactTap;
+
+  /// 点击事件 chip 的回调。
+  final VoidCallback? onEventTap;
+
   const NoteCard({
     super.key,
     required this.note,
     this.linkedContactName,
+    this.linkedEventTitle,
     this.onDelete,
     this.onClearTopics,
+    this.onContactTap,
+    this.onEventTap,
   });
 
   @override
@@ -90,7 +100,17 @@ class _NoteCardState extends State<NoteCard> {
                   ),
                   if (widget.linkedContactName != null) ...[
                     const SizedBox(height: AppSpacing.xs),
-                    _ContactChip(name: widget.linkedContactName!),
+                    _ContactChip(
+                      name: widget.linkedContactName!,
+                      onTap: widget.onContactTap,
+                    ),
+                  ],
+                  if (widget.linkedEventTitle != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    _EventChip(
+                      title: widget.linkedEventTitle!,
+                      onTap: widget.onEventTap,
+                    ),
                   ],
                   if (_topics.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.xs),
@@ -217,13 +237,14 @@ class _NoteTypeIndicator extends StatelessWidget {
 
 class _ContactChip extends StatelessWidget {
   final String name;
+  final VoidCallback? onTap;
 
-  const _ContactChip({required this.name});
+  const _ContactChip({required this.name, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
+    final chip = Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.sm,
         vertical: 2,
@@ -248,6 +269,61 @@ class _ContactChip extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+    if (onTap == null) return chip;
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: chip,
+      ),
+    );
+  }
+}
+
+class _EventChip extends StatelessWidget {
+  final String title;
+  final VoidCallback? onTap;
+
+  const _EventChip({required this.title, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        color: colorScheme.tertiaryContainer,
+        borderRadius: BorderRadius.circular(AppRadius.xs),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.event,
+            size: 10,
+            color: colorScheme.onTertiaryContainer,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: colorScheme.onTertiaryContainer,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (onTap == null) return chip;
+    return GestureDetector(
+      onTap: onTap,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: chip,
       ),
     );
   }

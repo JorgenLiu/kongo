@@ -8,6 +8,7 @@ import 'package:kongo/widgets/contact/contact_card.dart';
 import 'package:kongo/widgets/contact/contact_alphabet_index_bar.dart';
 import 'package:kongo/screens/contacts/contacts_list_screen.dart';
 import 'package:kongo/services/read/contact_read_service.dart';
+import 'package:kongo/services/read/notes_read_service.dart';
 import 'package:kongo/services/read/todo_read_service.dart';
 
 import '../test_helpers/test_app_harness.dart';
@@ -53,6 +54,7 @@ Widget buildContactsScreen(TestAppHarness harness) {
       ChangeNotifierProvider.value(value: harness.dependencies.tagProvider),
       Provider<ContactReadService>.value(value: harness.dependencies.contactReadService),
       Provider<TodoReadService>.value(value: harness.dependencies.todoReadService),
+      Provider<NotesReadService>.value(value: harness.dependencies.notesReadService),
     ],
     child: const MaterialApp(
       home: ContactsListScreen(),

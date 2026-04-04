@@ -12,6 +12,8 @@ import '../../widgets/contact/contact_alphabet_index_bar.dart';
 import '../../widgets/contact/contact_group_section.dart';
 import '../../widgets/contact/contact_header_tags_bar.dart';
 import '../../widgets/contact/contact_upcoming_milestones_card.dart';
+import '../../models/contact.dart';
+import 'contact_list_detail_panel.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/error_state.dart';
 import '../../widgets/common/skeleton_list.dart';
@@ -31,6 +33,7 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
   late ScrollController _listScrollController;
   late final InputDebouncer _searchDebouncer;
   bool _headerTagsExpanded = false;
+  String? _selectedContactId;
   String? _selectedQuickIndex;
   final Map<String, GlobalKey> _groupHeaderKeys = <String, GlobalKey>{};
   final GlobalKey _listViewportKey = GlobalKey();
@@ -165,24 +168,53 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
               },
             ),
             Expanded(
-              child: Consumer2<ContactProvider, TagProvider>(
-                builder: (context, contactProvider, tagProvider, _) {
-                  final contactGroups = buildContactGroups(contactProvider.contacts);
-                  final quickIndices = buildContactIndices(contactProvider.contacts);
-                  final effectiveQuickIndex =
-                      quickIndices.contains(_selectedQuickIndex) ? _selectedQuickIndex : null;
-                  final selectedTags = resolveSelectedTags(
-                    tagProvider.tags,
-                    contactProvider.selectedTagIds,
-                  );
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final twoColumn = constraints.maxWidth >= AppBreakpoints.standard;
+                  return Consumer2<ContactProvider, TagProvider>(
+                    builder: (context, contactProvider, tagProvider, _) {
+                      final contactGroups = buildContactGroups(contactProvider.contacts);
+                      final quickIndices = buildContactIndices(contactProvider.contacts);
+                      final effectiveQuickIndex =
+                          quickIndices.contains(_selectedQuickIndex) ? _selectedQuickIndex : null;
+                      final selectedTags = resolveSelectedTags(
+                        tagProvider.tags,
+                        contactProvider.selectedTagIds,
+                      );
 
-                  return _buildListPane(
-                    context,
-                    contactProvider: contactProvider,
-                    selectedTags: selectedTags,
-                    contactGroups: contactGroups,
-                    quickIndices: quickIndices,
-                    selectedQuickIndex: effectiveQuickIndex,
+                      final listPane = _buildListPane(
+                        context,
+                        contactProvider: contactProvider,
+                        selectedTags: selectedTags,
+                        contactGroups: contactGroups,
+                        quickIndices: quickIndices,
+                        selectedQuickIndex: effectiveQuickIndex,
+                        showItemActions: !twoColumn,
+                        onContactTap: twoColumn
+                            ? (contact) => setState(() => _selectedContactId = contact.id)
+                            : (contact) => _openContactDetail(contact),
+                      );
+
+                      if (!twoColumn) return listPane;
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Flexible(
+                            flex: 2,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minWidth: 340, maxWidth: 480),
+                              child: listPane,
+                            ),
+                          ),
+                          const VerticalDivider(width: 1),
+                          Flexible(
+                            flex: 3,
+                            child: ContactListDetailPanel(contactId: _selectedContactId),
+                          ),
+                        ],
+                      );
+                    },
                   );
                 },
               ),
@@ -200,46 +232,32 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     required List<ContactGroup> contactGroups,
     required List<String> quickIndices,
     required String? selectedQuickIndex,
+    required ValueChanged<Contact> onContactTap,
+    bool showItemActions = true,
   }) {
     final contactCount = contactGroups.fold<int>(0, (sum, group) => sum + group.contacts.length);
 
     return Column(
       children: [
-        custom_search.SearchBar(
-          controller: _searchController,
-          onChanged: _searchContacts,
-          onClear: _clearSearchAndFilters,
-          trailing: Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.md),
-            child: Text(
-              key: const Key('contactsBodyCountLabel'),
-              '$contactCount 人',
-              style: TextStyle(
-                fontSize: AppFontSize.bodySmall,
-                color: Theme.of(context).colorScheme.outline,
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: custom_search.SearchBar(
+            controller: _searchController,
+            onChanged: _searchContacts,
+            onClear: _clearSearchAndFilters,
+            trailing: Padding(
+              padding: const EdgeInsets.only(right: AppSpacing.md),
+              child: Text(
+                key: const Key('contactsBodyCountLabel'),
+                '$contactCount 人',
+                style: TextStyle(
+                  fontSize: AppFontSize.bodySmall,
+                  color: Theme.of(context).colorScheme.outline,
+                ),
               ),
             ),
           ),
         ),
-        if (contactProvider.keyword.trim().isEmpty && selectedTags.isEmpty) ...[
-          LimitedBox(
-            maxHeight: 300,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                0,
-                AppSpacing.md,
-                AppSpacing.sm,
-              ),
-              child: ContactUpcomingMilestonesCard(
-                items: contactProvider.upcomingMilestones,
-                onContactTap: _openContactDetail,
-              ),
-            ),
-          ),
-          const Divider(height: 1, indent: AppSpacing.md, endIndent: AppSpacing.md),
-          const SizedBox(height: AppSpacing.sm),
-        ],
         Expanded(
           child: _buildBody(
             context,
@@ -247,6 +265,8 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
             contactGroups,
             quickIndices,
             selectedQuickIndex,
+            onContactTap,
+            showItemActions: showItemActions,
           ),
         ),
       ],
@@ -259,7 +279,9 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     List<ContactGroup> contactGroups,
     List<String> quickIndices,
     String? selectedQuickIndex,
-  ) {
+    ValueChanged<Contact> onContactTap, {
+    bool showItemActions = true,
+  }) {
     final Widget child;
 
     if (contactProvider.loading && !contactProvider.initialized) {
@@ -275,6 +297,7 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
     } else {
       child = Row(
         key: const ValueKey('contacts_content'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: SingleChildScrollView(
@@ -287,15 +310,24 @@ class _ContactsListScreenState extends State<ContactsListScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (contactProvider.keyword.isEmpty &&
+                    contactProvider.selectedTagIds.isEmpty &&
+                    contactProvider.upcomingMilestones.isNotEmpty) ...[                  
+                  ContactUpcomingMilestonesCard(
+                    items: contactProvider.upcomingMilestones,
+                    onContactTap: onContactTap,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
                 for (var index = 0; index < contactGroups.length; index++) ...[
                   ContactGroupSection(
                     key: ValueKey('contactGroup_${contactGroups[index].indexLabel}'),
                     label: contactGroups[index].indexLabel,
                     contacts: contactGroups[index].contacts,
                     headerKey: _headerKeyFor(contactGroups[index].indexLabel),
-                    onTap: _openContactDetail,
-                    onEdit: (contact) => editContactFromList(context, contact),
-                    onDelete: (contact) => deleteContactFromList(context, contact),
+                    onTap: onContactTap,
+                    onEdit: showItemActions ? (contact) => editContactFromList(context, contact) : null,
+                    onDelete: showItemActions ? (contact) => deleteContactFromList(context, contact) : null,
                   ),
                   if (index < contactGroups.length - 1)
                     const SizedBox(height: AppSpacing.xs),

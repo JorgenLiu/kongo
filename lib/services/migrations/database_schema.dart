@@ -403,6 +403,32 @@ const String createTodoItemEventsItemIdIndex =
 const String createTodoItemEventsEventIdIndex =
     'CREATE INDEX idx_todo_item_events_eventId ON todo_item_events(eventId)';
 
+// ──────────────────── info_tags (v11) ────────────────────
+
+const String createInfoTagsTable = '''
+CREATE TABLE info_tags (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  createdAt INTEGER NOT NULL
+)
+''';
+
+const String createContactInfoTagsTable = '''
+CREATE TABLE contact_info_tags (
+  id TEXT PRIMARY KEY,
+  contactId TEXT NOT NULL,
+  infoTagId TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'manual',
+  addedAt INTEGER NOT NULL,
+  FOREIGN KEY (contactId) REFERENCES contacts(id) ON DELETE CASCADE,
+  FOREIGN KEY (infoTagId) REFERENCES info_tags(id) ON DELETE CASCADE,
+  UNIQUE(contactId, infoTagId)
+)
+''';
+
+const String createContactInfoTagsContactIdIndex =
+    'CREATE INDEX idx_contact_info_tags_contact ON contact_info_tags(contactId)';
+
 // ──────────────────── quick_notes (v10) ────────────────────
 
 const String createQuickNotesTable = '''
@@ -495,6 +521,9 @@ const List<String> createSchemaStatements = [
     createQuickNotesCaptureDateIndex,
     createQuickNotesSessionGroupIndex,
     createQuickNotesLinkedContactIdIndex,
+    createInfoTagsTable,
+    createContactInfoTagsTable,
+    createContactInfoTagsContactIdIndex,
 ];
 
 /// v1 → v2 迁移语句（新增事件/附件/AI 表）。

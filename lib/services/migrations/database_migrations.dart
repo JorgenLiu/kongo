@@ -45,6 +45,9 @@ Future<void> onUpgradeDatabase(Database db, int oldVersion, int newVersion) asyn
   if (oldVersion < 10) {
     await migrateToVersion10(db);
   }
+  if (oldVersion < 11) {
+    await migrateToVersion11(db);
+  }
 }
 
 // ──────────────────── v1 → v2 ────────────────────
@@ -322,6 +325,16 @@ Future<void> migrateToVersion10(Database db) async {
   await db.execute(createQuickNotesCaptureDateIndex);
   await db.execute(createQuickNotesSessionGroupIndex);
   await db.execute(createQuickNotesLinkedContactIdIndex);
+}
+
+// ──────────────────── v10 → v11 ────────────────────
+
+Future<void> migrateToVersion11(Database db) async {
+  final batch = db.batch();
+  batch.execute(createInfoTagsTable);
+  batch.execute(createContactInfoTagsTable);
+  batch.execute(createContactInfoTagsContactIdIndex);
+  await batch.commit(noResult: true);
 }
 
 // ──────────────────── 预置数据 ────────────────────

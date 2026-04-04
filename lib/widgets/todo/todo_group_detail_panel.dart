@@ -64,9 +64,24 @@ class TodoGroupDetailPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              detail!.group.title,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Expanded(
+                  child: Text(
+                    detail!.group.title,
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  '${detail!.rootItems.length} 项',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                ),
+              ],
             ),
             if ((detail!.group.description ?? '').trim().isNotEmpty) ...[
               const SizedBox(height: AppSpacing.xs),
@@ -170,7 +185,9 @@ class _TodoItemCard extends StatelessWidget {
     final completed = node.item.status == TodoItemStatus.completed;
     final selected = selectedItemIds.contains(node.item.id);
 
-    return Material(
+    return Opacity(
+      opacity: completed ? 0.6 : 1.0,
+      child: Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -183,9 +200,9 @@ class _TodoItemCard extends StatelessWidget {
                     ? colorScheme.surfaceContainerLow
                     : colorScheme.surface,
             borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(
-              color: selected ? colorScheme.primary : colorScheme.outlineVariant,
-            ),
+            border: selected
+                ? Border.all(color: colorScheme.primary)
+                : null,
           ),
           padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
@@ -279,6 +296,7 @@ class _TodoItemCard extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

@@ -21,9 +21,6 @@ class HomeDailyBriefSummaryPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface.withValues(alpha: 0.22),
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: colorScheme.onPrimaryContainer.withValues(alpha: 0.12),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

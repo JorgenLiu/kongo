@@ -90,6 +90,11 @@ class _TodoBoardScreenState extends State<TodoBoardScreen> {
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         if (data.groups.isEmpty) {
+                          if (constraints.maxWidth >= AppBreakpoints.standard) {
+                            return _TodoDesktopEmptyState(
+                              onCreateGroup: () => createTodoGroupAction(context),
+                            );
+                          }
                           return EmptyState(
                             icon: Icons.playlist_add_check_rounded,
                             iconSize: 72,
@@ -199,6 +204,65 @@ class _TodoBoardScreenState extends State<TodoBoardScreen> {
 
             return child;
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// 桌面端待办事项组空状态：左侧大图标 + 右侧文案与操作，充分利用横向空间。
+class _TodoDesktopEmptyState extends StatelessWidget {
+  final VoidCallback onCreateGroup;
+
+  const _TodoDesktopEmptyState({required this.onCreateGroup});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 640),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.playlist_add_check_rounded,
+              size: 96,
+              color: colorScheme.outline.withValues(alpha: 0.3),
+            ),
+            const SizedBox(width: AppSpacing.xl),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '还没有待办事项组',
+                    style: textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    '待办组可以帮你按项目或主题组织任务，并关联联系人和日程。',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.outline,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  FilledButton.icon(
+                    onPressed: onCreateGroup,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('新建待办组'),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

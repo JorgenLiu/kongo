@@ -345,13 +345,15 @@ class _CalendarDayCell extends StatelessWidget {
     final backgroundColor = isSelected
         ? colorScheme.primaryContainer
         : isToday
-            ? colorScheme.surfaceContainerHigh
+            ? colorScheme.primary
             : colorScheme.surfaceContainerLow;
     final foregroundColor = isSelected
         ? colorScheme.onPrimaryContainer
-        : hasEvents
-            ? AppColors.warning
-            : colorScheme.onSurface;
+        : isToday
+            ? colorScheme.onPrimary
+            : hasEvents
+                ? AppColors.warning
+                : colorScheme.onSurface;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -389,21 +391,11 @@ class _CalendarDayCell extends StatelessWidget {
                       waitDuration: const Duration(milliseconds: 250),
                       child: Container(
                         key: Key('eventsMonthlyCalendar_nodeBadge_$day'),
-                        constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        width: 8,
+                        height: 8,
                         decoration: BoxDecoration(
                           color: nodeStyle!.backgroundColor,
-                          borderRadius: BorderRadius.circular(7),
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          buildCalendarTimeNodeBadgeLabel(calendarNodes),
-                          style: TextStyle(
-                            fontSize: compact ? 8 : 9,
-                            fontWeight: FontWeight.w700,
-                            color: nodeStyle.foregroundColor,
-                            height: 1.1,
-                          ),
+                          shape: BoxShape.circle,
                         ),
                       ),
                     ),

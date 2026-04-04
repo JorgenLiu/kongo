@@ -24,6 +24,7 @@ import '../repositories/daily_brief_delivery_repository.dart';
 import '../repositories/event_repository.dart';
 import '../repositories/summary_repository.dart';
 import '../repositories/tag_repository.dart';
+import '../repositories/info_tag_repository.dart';
 import 'attachment_preview_service.dart';
 import 'ai_secret_store.dart';
 import 'attachment_service.dart';
@@ -49,6 +50,7 @@ import 'reminder_service.dart';
 import 'settings_preferences_store.dart';
 import 'summary_service.dart';
 import 'tag_service.dart';
+import 'info_tag_service.dart';
 import 'todo_service.dart';
 
 class AppDependencies {
@@ -85,6 +87,9 @@ class AppDependencies {
   final QuickNoteEnrichmentService quickNoteEnrichmentService;
   final NotesReadService notesReadService;
   final NotesProvider notesProvider;
+  final QuickNoteRepository quickNoteRepository;
+  final InfoTagRepository infoTagRepository;
+  final InfoTagService infoTagService;
 
   AppDependencies._({
     required this.databaseService,
@@ -120,6 +125,9 @@ class AppDependencies {
     required this.quickNoteEnrichmentService,
     required this.notesReadService,
     required this.notesProvider,
+    required this.quickNoteRepository,
+    required this.infoTagRepository,
+    required this.infoTagService,
   });
 
   static Future<AppDependencies> bootstrap({
@@ -265,11 +273,18 @@ class AppDependencies {
     );
 
     final quickCaptureService = DefaultQuickCaptureService(resolvedDatabaseService, quickNoteRepository);
+    final infoTagRepository = SqliteInfoTagRepository(resolvedDatabaseService);
+    final infoTagService = DefaultInfoTagService(infoTagRepository);
     final quickNoteEnrichmentService = DefaultQuickNoteEnrichmentService(
       aiService,
       quickNoteRepository,
     );
-    final notesReadService = DefaultNotesReadService(quickNoteRepository, summaryRepository);
+    final notesReadService = DefaultNotesReadService(
+      quickNoteRepository,
+      summaryRepository,
+      contactRepository: contactRepository,
+      eventRepository: eventRepository,
+    );
 
     final contactProvider = ContactProvider(contactService, contactMilestoneService);
     final attachmentProvider = AttachmentProvider(attachmentService);
@@ -326,6 +341,9 @@ class AppDependencies {
       quickNoteEnrichmentService: quickNoteEnrichmentService,
       notesReadService: notesReadService,
       notesProvider: notesProvider,
+      quickNoteRepository: quickNoteRepository,
+      infoTagRepository: infoTagRepository,
+      infoTagService: infoTagService,
     );
   }
 

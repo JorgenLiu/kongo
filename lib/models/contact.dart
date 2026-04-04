@@ -8,6 +8,7 @@ class Contact {
   final String? avatar;
   final String? notes;
   final List<String> tags;
+  final List<String> infoTags;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -20,6 +21,7 @@ class Contact {
     this.avatar,
     this.notes,
     this.tags = const [],
+    this.infoTags = const [],
     required this.createdAt,
     required this.updatedAt,
   });
@@ -27,6 +29,7 @@ class Contact {
   factory Contact.fromMap(
     Map<String, dynamic> map, {
     List<String> tags = const [],
+    List<String> infoTags = const [],
   }) {
     return Contact(
       id: map['id'] as String,
@@ -37,6 +40,7 @@ class Contact {
       avatar: map['avatarPath'] as String?,
       notes: map['notes'] as String?,
       tags: tags,
+      infoTags: infoTags,
       createdAt: DateTime.fromMillisecondsSinceEpoch(
         (map['createdAt'] as num).toInt(),
       ),
@@ -69,6 +73,7 @@ class Contact {
     String? avatar,
     String? notes,
     List<String>? tags,
+    List<String>? infoTags,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -81,6 +86,7 @@ class Contact {
       avatar: avatar ?? this.avatar,
       notes: notes ?? this.notes,
       tags: tags ?? this.tags,
+      infoTags: infoTags ?? this.infoTags,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

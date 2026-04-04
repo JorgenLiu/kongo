@@ -26,6 +26,7 @@ abstract class AttachmentRepository {
     List<String> ownerIds,
   );
   Future<int> getLinkCount(String attachmentId);
+  Future<List<Attachment>> searchByKeyword(String keyword);
 }
 
 class SqliteAttachmentRepository implements AttachmentRepository {
@@ -219,6 +220,22 @@ ORDER BY l.ownerId ASC, l.addedAt DESC
         [attachmentId],
       );
       return (rows.first['count'] as num?)?.toInt() ?? 0;
+    });
+  }
+
+  @override
+  Future<List<Attachment>> searchByKeyword(String keyword) async {
+    return _run<List<Attachment>>('搜索附件失败', (db) async {
+      final normalizedKeyword = '%${keyword.trim().toLowerCase()}%';
+      final rows = await db.query(
+        DatabaseService.attachmentsTable,
+        where: 'LOWER(fileName) LIKE ? OR '
+            'LOWER(originalFileName) LIKE ? OR '
+            'LOWER(previewText) LIKE ?',
+        whereArgs: [normalizedKeyword, normalizedKeyword, normalizedKeyword],
+        orderBy: 'updatedAt DESC',
+      );
+      return rows.map(_toAttachment).toList();
     });
   }
 

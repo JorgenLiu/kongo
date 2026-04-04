@@ -23,6 +23,7 @@ import 'package:kongo/services/event_service.dart';
 import 'package:kongo/services/read/contact_read_service.dart';
 import 'package:kongo/services/read/event_read_service.dart';
 import 'package:kongo/services/read/summary_read_service.dart';
+import 'package:kongo/services/read/notes_read_service.dart';
 import 'package:kongo/services/read/todo_read_service.dart';
 import 'package:kongo/services/settings_preferences_store.dart';
 import 'package:kongo/services/summary_service.dart';
@@ -228,6 +229,7 @@ Widget buildActionTestApp(
         value: harness.dependencies.summaryReadService,
       ),
       Provider<TodoReadService>.value(value: harness.dependencies.todoReadService),
+      Provider<NotesReadService>.value(value: harness.dependencies.notesReadService),
     ],
     child: MaterialApp(
       theme: AppTheme.lightTheme,

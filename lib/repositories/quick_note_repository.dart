@@ -37,6 +37,24 @@ abstract class QuickNoteRepository {
 
   /// 清除 AI 富化数据（aiMetadata 和 enrichedAt 置 null）。
   Future<void> clearAiMetadata(String id);
+
+  /// 查询关联到指定联系人的所有笔记（未软删），按 createdAt 倒序。
+  Future<List<QuickNote>> findByContactId(String contactId);
+
+  /// 查询关联到指定事件的所有笔记（未软删），按 createdAt 倒序。
+  Future<List<QuickNote>> findByEventId(String eventId);
+
+  /// 全文搜索笔记（content + aiMetadata），未软删，按 createdAt 倒序。
+  Future<List<QuickNote>> searchByKeyword(String keyword);
+
+  /// 分页查询（未软删），按 createdAt 倒序。
+  /// [offset] 从 0 开始；[limit] 默认 30。
+  /// [contactId] 非 null 时只返回关联该联系人的笔记。
+  Future<List<QuickNote>> findPage({
+    int offset = 0,
+    int limit = 30,
+    String? contactId,
+  });
 }
 
 class SqliteQuickNoteRepository implements QuickNoteRepository {
@@ -191,6 +209,69 @@ class SqliteQuickNoteRepository implements QuickNoteRepository {
           code: 'quick_note_not_found',
         );
       }
+    });
+  }
+
+  @override
+  Future<List<QuickNote>> findByContactId(String contactId) async {
+    return _run<List<QuickNote>>('查询联系人关联笔记失败', (db) async {
+      final rows = await db.query(
+        DatabaseService.quickNotesTable,
+        where: 'linkedContactId = ? AND deletedAt IS NULL',
+        whereArgs: [contactId],
+        orderBy: 'createdAt DESC',
+      );
+      return rows.map(QuickNote.fromMap).toList();
+    });
+  }
+
+  @override
+  Future<List<QuickNote>> findByEventId(String eventId) async {
+    return _run<List<QuickNote>>('查询事件关联笔记失败', (db) async {
+      final rows = await db.query(
+        DatabaseService.quickNotesTable,
+        where: 'linkedEventId = ? AND deletedAt IS NULL',
+        whereArgs: [eventId],
+        orderBy: 'createdAt DESC',
+      );
+      return rows.map(QuickNote.fromMap).toList();
+    });
+  }
+
+  @override
+  Future<List<QuickNote>> searchByKeyword(String keyword) async {
+    return _run<List<QuickNote>>('搜索笔记失败', (db) async {
+      final pattern = '%$keyword%';
+      final rows = await db.query(
+        DatabaseService.quickNotesTable,
+        where: '(content LIKE ? OR aiMetadata LIKE ?) AND deletedAt IS NULL',
+        whereArgs: [pattern, pattern],
+        orderBy: 'createdAt DESC',
+      );
+      return rows.map(QuickNote.fromMap).toList();
+    });
+  }
+
+  @override
+  Future<List<QuickNote>> findPage({
+    int offset = 0,
+    int limit = 30,
+    String? contactId,
+  }) async {
+    return _run<List<QuickNote>>('分页查询笔记失败', (db) async {
+      final where = contactId != null
+          ? 'linkedContactId = ? AND deletedAt IS NULL'
+          : 'deletedAt IS NULL';
+      final whereArgs = contactId != null ? [contactId] : null;
+      final rows = await db.query(
+        DatabaseService.quickNotesTable,
+        where: where,
+        whereArgs: whereArgs,
+        orderBy: 'createdAt DESC',
+        limit: limit,
+        offset: offset,
+      );
+      return rows.map(QuickNote.fromMap).toList();
     });
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
 import '../../models/contact.dart';
+import '../../models/contact_milestone.dart';
 import '../../models/contact_upcoming_milestone.dart';
 import '../../utils/display_formatters.dart';
 import '../common/section_card.dart';
@@ -98,7 +99,7 @@ class _UpcomingMilestoneRow extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(item.milestone.type.icon, style: const TextStyle(fontSize: 16)),
+            Icon(_milestoneTypeIconData(item.milestone.type), size: 16, color: colorScheme.primary),
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Column(
@@ -140,4 +141,17 @@ class _UpcomingMilestoneRow extends StatelessWidget {
     }
     return '还有 $daysUntil 天';
   }
+}
+
+IconData _milestoneTypeIconData(ContactMilestoneType type) {
+  return switch (type) {
+    ContactMilestoneType.birthday => Icons.cake_outlined,
+    ContactMilestoneType.weddingAnniversary => Icons.favorite_border,
+    ContactMilestoneType.workStart => Icons.work_outline,
+    ContactMilestoneType.graduation => Icons.school_outlined,
+    ContactMilestoneType.firstMet => Icons.people_outline,
+    ContactMilestoneType.collaborationStart => Icons.assignment_outlined,
+    ContactMilestoneType.memorial => Icons.hourglass_empty,
+    ContactMilestoneType.custom => Icons.push_pin_outlined,
+  };
 }

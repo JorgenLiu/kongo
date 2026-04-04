@@ -70,7 +70,7 @@ class _EventsListView extends StatefulWidget {
   State<_EventsListView> createState() => _EventsListViewState();
 }
 
-class _EventsListViewState extends State<_EventsListView> {
+class _EventsListViewState extends State<_EventsListView> with WidgetsBindingObserver {
   late DateTime _selectedDate;
   late final TextEditingController _searchController;
   late final InputDebouncer _searchDebouncer;
@@ -80,6 +80,7 @@ class _EventsListViewState extends State<_EventsListView> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _selectedDate = _resolveSelectedDate(widget.initialSelectedDate ?? DateTime.now());
     _searchController = TextEditingController();
     _searchDebouncer = InputDebouncer();
@@ -93,9 +94,18 @@ class _EventsListViewState extends State<_EventsListView> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _searchDebouncer.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 当应用恢复焦点时（如 Quick Capture popover 关闭后）刷新事件列表
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<EventsListProvider>().refresh();
+    }
   }
 
   void _searchEvents(String keyword) {

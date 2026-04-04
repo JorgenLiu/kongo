@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../config/app_constants.dart';
+import '../../models/attachment.dart';
 import '../../models/contact.dart';
 import '../../models/event_summary.dart';
+import '../../models/quick_note.dart';
 import '../../services/read/event_read_service.dart';
 import '../event/event_search_results_list.dart';
 import 'highlighted_search_text.dart';
@@ -12,9 +14,14 @@ class GlobalSearchResults extends StatelessWidget {
   final List<Contact> contacts;
   final List<EventListItemReadModel> events;
   final List<DailySummary> summaries;
+  final List<Attachment> attachments;
+  final List<QuickNote> notes;
+  final List<Contact> contactsByInfoTag;
   final ValueChanged<Contact> onContactTap;
   final ValueChanged<EventListItemReadModel> onEventTap;
   final ValueChanged<DailySummary> onSummaryTap;
+  final ValueChanged<Attachment> onAttachmentTap;
+  final ValueChanged<QuickNote> onNoteTap;
 
   const GlobalSearchResults({
     super.key,
@@ -22,9 +29,14 @@ class GlobalSearchResults extends StatelessWidget {
     required this.contacts,
     required this.events,
     required this.summaries,
+    required this.attachments,
+    required this.notes,
+    this.contactsByInfoTag = const [],
     required this.onContactTap,
     required this.onEventTap,
     required this.onSummaryTap,
+    required this.onAttachmentTap,
+    required this.onNoteTap,
   });
 
   @override
@@ -53,6 +65,28 @@ class GlobalSearchResults extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
         ],
+        if (contactsByInfoTag.isNotEmpty) ...[
+          _SearchSection(
+            title: '信息标签匹配',
+            count: contactsByInfoTag.length,
+            child: Column(
+              children: contactsByInfoTag
+                  .map(
+                    (contact) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: _ContactSearchResultCard(
+                        contact: contact,
+                        query: query,
+                        onTap: () => onContactTap(contact),
+                        subtitleOverride: '信息标签命中',
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         if (events.isNotEmpty) ...[
           _SearchSection(
             title: '日程',
@@ -65,7 +99,7 @@ class GlobalSearchResults extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
         ],
-        if (summaries.isNotEmpty)
+        if (summaries.isNotEmpty) ...[
           _SearchSection(
             title: '总结',
             count: summaries.length,
@@ -84,6 +118,50 @@ class GlobalSearchResults extends StatelessWidget {
                   .toList(),
             ),
           ),
+          if (attachments.isNotEmpty || notes.isNotEmpty)
+            const SizedBox(height: AppSpacing.lg),
+        ],
+        if (attachments.isNotEmpty) ...[
+          _SearchSection(
+            title: '文件',
+            count: attachments.length,
+            child: Column(
+              children: attachments
+                  .map(
+                    (attachment) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: _AttachmentSearchResultCard(
+                        attachment: attachment,
+                        query: query,
+                        onTap: () => onAttachmentTap(attachment),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+          if (notes.isNotEmpty)
+            const SizedBox(height: AppSpacing.lg),
+        ],
+        if (notes.isNotEmpty)
+          _SearchSection(
+            title: '记录',
+            count: notes.length,
+            child: Column(
+              children: notes
+                  .map(
+                    (note) => Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                      child: _NoteSearchResultCard(
+                        note: note,
+                        query: query,
+                        onTap: () => onNoteTap(note),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
       ],
     );
   }
@@ -93,11 +171,13 @@ class _ContactSearchResultCard extends StatelessWidget {
   final Contact contact;
   final String query;
   final VoidCallback onTap;
+  final String? subtitleOverride;
 
   const _ContactSearchResultCard({
     required this.contact,
     required this.query,
     required this.onTap,
+    this.subtitleOverride,
   });
 
   @override
@@ -143,7 +223,7 @@ class _ContactSearchResultCard extends StatelessWidget {
                   style: TextStyle(color: colorScheme.outline),
                 ),
               ],
-              if ((contact.notes ?? '').isNotEmpty) ...[
+              if ((contact.notes ?? '').isNotEmpty && subtitleOverride == null) ...[
                 const SizedBox(height: AppSpacing.sm),
                 HighlightedSearchText(
                   text: contact.notes!,
@@ -151,6 +231,15 @@ class _ContactSearchResultCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+              if (subtitleOverride != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  subtitleOverride!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.tertiary,
+                  ),
                 ),
               ],
             ],
@@ -250,6 +339,131 @@ class _SummaryBlock extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
+    );
+  }
+}
+
+class _AttachmentSearchResultCard extends StatelessWidget {
+  final Attachment attachment;
+  final String query;
+  final VoidCallback onTap;
+
+  const _AttachmentSearchResultCard({
+    required this.attachment,
+    required this.query,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Row(
+            children: [
+              Icon(Icons.attach_file_outlined,
+                  color: colorScheme.primary, size: 20),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    HighlightedSearchText(
+                      text: attachment.fileName,
+                      query: query,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (attachment.previewText != null &&
+                        attachment.previewText!.trim().isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      HighlightedSearchText(
+                        text: attachment.previewText!,
+                        query: query,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(Icons.open_in_new_rounded, size: 16, color: colorScheme.outline),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NoteSearchResultCard extends StatelessWidget {
+  final QuickNote note;
+  final String query;
+  final VoidCallback onTap;
+
+  const _NoteSearchResultCard({
+    required this.note,
+    required this.query,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final dateStr =
+        '${note.captureDate.year}/${note.captureDate.month.toString().padLeft(2, '0')}/${note.captureDate.day.toString().padLeft(2, '0')}';
+
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.edit_note,
+                    size: 16,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Text(
+                    dateStr,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.outline,
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(Icons.chevron_right_rounded, color: colorScheme.outline),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              HighlightedSearchText(
+                text: note.content,
+                query: query,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

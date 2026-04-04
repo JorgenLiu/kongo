@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/attachment_link.dart';
 import '../../models/contact.dart';
 import '../../models/contact_draft.dart';
 import '../../models/contact_milestone.dart';
 import '../../providers/contact_detail_provider.dart';
 import '../../providers/contact_provider.dart';
+import '../../providers/files_provider.dart';
+import '../../providers/notes_provider.dart';
+import '../../services/attachment_service.dart';
 import '../../services/contact_milestone_service.dart';
+import '../../services/read/notes_read_service.dart';
 import '../../utils/contact_action_helpers.dart';
 import '../../config/page_transitions.dart';
 import '../../utils/navigation_helpers.dart';
 import '../../widgets/contact/contact_milestone_form_dialog.dart';
 import '../events/event_detail_screen.dart';
 import '../events/events_list_screen.dart';
+import '../files/files_overview_screen.dart';
+import '../notes/notes_overview_screen.dart';
 import 'contact_form_screen.dart';
 
 Future<void> openContactEventsModule(BuildContext context, Contact contact) async {
@@ -114,10 +121,32 @@ Future<void> deleteContactDetail(
   }
 }
 
-void showPendingContactModuleHint(BuildContext context, String moduleName) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text('$moduleName 模块的完整页面将在下一步接入')),
+Future<void> openContactFilesLibrary(
+  BuildContext context, {
+  required Contact contact,
+  required List<String> eventIds,
+}) async {
+  final attachmentService = context.read<AttachmentService>();
+  await Navigator.of(context).push(
+    buildAdaptiveDetailRoute(
+      ChangeNotifierProvider(
+        create: (_) => FilesProvider(
+          attachmentService,
+          scope: FilesScope(
+            ownerType: AttachmentOwnerType.event,
+            ownerIds: eventIds,
+          ),
+          enableBackgroundPreviewWarmup: false,
+        )..loadFiles(),
+        child: FilesOverviewScreen(
+          scopeLabel: '${contact.name} 的相关附件',
+        ),
+      ),
+    ),
   );
+
+  if (!context.mounted) return;
+  await context.read<ContactDetailProvider>().refresh();
 }
 
 Future<void> addMilestoneAction(BuildContext context, String contactId) async {
@@ -186,4 +215,23 @@ Future<void> deleteMilestoneAction(
 
   if (!context.mounted) return;
   await context.read<ContactDetailProvider>().refresh();
+}
+
+/// 切换到 Notes 页并激活该联系人的筛选，让用户查看与该联系人关联的所有笔记。
+Future<void> openNotesFilteredByContact(
+  BuildContext context,
+  Contact contact,
+) async {
+  await context.read<NotesProvider>().setFilter(
+    NotesFilter(contactId: contact.id, contactName: contact.name),
+  );
+
+  if (!context.mounted) return;
+
+  await Navigator.of(context).push(
+    buildAdaptiveDetailRoute(const NotesOverviewScreen()),
+  );
+
+  if (!context.mounted) return;
+  context.read<NotesProvider>().clearFilter();
 }

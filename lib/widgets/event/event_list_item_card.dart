@@ -180,7 +180,6 @@ class _EventListItemCardState extends State<EventListItemCard> {
                     decoration: BoxDecoration(
                       color: colorScheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(AppRadius.md),
-                      border: Border.all(color: colorScheme.outlineVariant),
                     ),
                     child: HighlightedSearchText(
                       text: event.description!,
@@ -271,7 +270,6 @@ class _EventListItemCardState extends State<EventListItemCard> {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: AppOpacity.elevated),
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

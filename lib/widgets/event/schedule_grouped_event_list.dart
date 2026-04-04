@@ -105,6 +105,19 @@ class ScheduleGroupedEventList extends StatelessWidget {
         .toList()
       ..sort(_sortByStartAtDescending);
 
+    // 当前周以外的事件：历史（早于 weekStart）和未来（晚于 weekEnd）
+    final historyItems = items
+        .where((item) =>
+            item.event.startAt != null && item.event.startAt!.isBefore(weekStart))
+        .toList()
+      ..sort(_sortByStartAtDescending);
+
+    final futureItems = items
+        .where((item) =>
+            item.event.startAt != null && !item.event.startAt!.isBefore(weekEnd))
+        .toList()
+      ..sort(_sortByStartAtAscending);
+
     final sections = <_ScheduleSectionModel>[];
     if (todayItems.isNotEmpty) {
       sections.add(_ScheduleSectionModel(title: '今日日程', items: todayItems));
@@ -114,6 +127,12 @@ class ScheduleGroupedEventList extends StatelessWidget {
     }
     if (earlierItems.isNotEmpty) {
       sections.add(_ScheduleSectionModel(title: '本周较早', items: earlierItems));
+    }
+    if (futureItems.isNotEmpty) {
+      sections.add(_ScheduleSectionModel(title: '未来安排', items: futureItems));
+    }
+    if (historyItems.isNotEmpty) {
+      sections.add(_ScheduleSectionModel(title: '历史日程', items: historyItems));
     }
 
     return sections;

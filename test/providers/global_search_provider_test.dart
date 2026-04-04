@@ -21,6 +21,8 @@ void main() {
       harness.dependencies.contactService,
       harness.dependencies.eventReadService,
       harness.dependencies.summaryService,
+      harness.dependencies.attachmentService,
+      harness.dependencies.quickNoteRepository,
     );
 
     await provider.search('报价');
@@ -50,6 +52,8 @@ void main() {
       harness.dependencies.contactService,
       harness.dependencies.eventReadService,
       harness.dependencies.summaryService,
+      harness.dependencies.attachmentService,
+      harness.dependencies.quickNoteRepository,
     );
 
     await provider.search('报价');

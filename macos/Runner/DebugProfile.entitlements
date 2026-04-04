@@ -10,5 +10,10 @@
 	<true/>
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- Allow Flutter DevFS to create temp files in /tmp (needed for hot reload in debug mode) -->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
+	<array>
+		<string>/private/tmp/</string>
+	</array>
 </dict>
 </plist>

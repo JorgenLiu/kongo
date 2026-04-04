@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../config/app_constants.dart';
 import '../../models/tag.dart';
 
-class ContactFormTagsSection extends StatelessWidget {
+class ContactFormTagsSection extends StatefulWidget {
   final List<Tag> tags;
   final Set<String> selectedTagIds;
   final bool loading;
@@ -18,6 +18,14 @@ class ContactFormTagsSection extends StatelessWidget {
     required this.onManageTagsTap,
     required this.onTagToggle,
   });
+
+  @override
+  State<ContactFormTagsSection> createState() => _ContactFormTagsSectionState();
+}
+
+class _ContactFormTagsSectionState extends State<ContactFormTagsSection> {
+  bool _expanded = false;
+  static const int _collapseAt = 8;
 
   @override
   Widget build(BuildContext context) {
@@ -38,18 +46,18 @@ class ContactFormTagsSection extends StatelessWidget {
               ),
             ),
             TextButton(
-              onPressed: onManageTagsTap,
+              onPressed: widget.onManageTagsTap,
               child: const Text('管理分组'),
             ),
           ],
         ),
         const SizedBox(height: AppSpacing.xs),
-        if (loading && tags.isEmpty)
+        if (widget.loading && widget.tags.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
             child: Center(child: CircularProgressIndicator()),
           )
-        else if (tags.isEmpty)
+        else if (widget.tags.isEmpty)
           Container(
             padding: const EdgeInsets.all(AppSpacing.md),
             decoration: BoxDecoration(
@@ -65,14 +73,23 @@ class ContactFormTagsSection extends StatelessWidget {
           Wrap(
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.sm,
-            children: tags.map((tag) {
-              final selected = selectedTagIds.contains(tag.id);
-              return FilterChip(
-                label: Text(tag.name),
-                selected: selected,
-                onSelected: (_) => onTagToggle(tag.id),
-              );
-            }).toList(),
+            children: [
+              ...(_expanded ? widget.tags : widget.tags.take(_collapseAt)).map((tag) {
+                final selected = widget.selectedTagIds.contains(tag.id);
+                return FilterChip(
+                  label: Text(tag.name),
+                  selected: selected,
+                  onSelected: (_) => widget.onTagToggle(tag.id),
+                );
+              }),
+              if (!_expanded && widget.tags.length > _collapseAt)
+                ActionChip(
+                  label: Text('+${widget.tags.length - _collapseAt}'),
+                  onPressed: () => setState(() => _expanded = true),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+            ],
           ),
       ],
     );

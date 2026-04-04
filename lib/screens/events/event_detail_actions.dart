@@ -9,6 +9,8 @@ import '../../models/event_draft.dart';
 import '../../providers/attachment_provider.dart';
 import '../../providers/event_detail_provider.dart';
 import '../../providers/event_provider.dart';
+import '../../providers/files_provider.dart';
+import '../../services/attachment_service.dart';
 import '../../services/event_service.dart';
 import '../../utils/attachment_action_helpers.dart';
 import '../../utils/contact_action_helpers.dart';
@@ -17,7 +19,35 @@ import '../../utils/event_action_helpers.dart';
 import '../../config/page_transitions.dart';
 import '../../utils/navigation_helpers.dart';
 import '../contacts/contact_detail_screen.dart';
+import '../files/files_overview_screen.dart';
 import 'event_form_screen.dart';
+
+Future<void> openEventFilesLibrary(
+  BuildContext context, {
+  required Event event,
+}) async {
+  final attachmentService = context.read<AttachmentService>();
+  await Navigator.of(context).push(
+    buildAdaptiveDetailRoute(
+      ChangeNotifierProvider(
+        create: (_) => FilesProvider(
+          attachmentService,
+          scope: FilesScope(
+            ownerType: AttachmentOwnerType.event,
+            ownerIds: [event.id],
+          ),
+          enableBackgroundPreviewWarmup: false,
+        )..loadFiles(),
+        child: FilesOverviewScreen(
+          scopeLabel: '${event.title} 的附件',
+        ),
+      ),
+    ),
+  );
+
+  if (!context.mounted) return;
+  await context.read<EventDetailProvider>().refresh();
+}
 
 Future<void> openEventParticipantContactDetail(BuildContext context, String contactId) async {
   await Navigator.of(context).push(

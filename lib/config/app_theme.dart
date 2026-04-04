@@ -133,8 +133,8 @@ class AppTheme {
     onSurface: AppColors.onSurfaceDark,
     surfaceContainerLow: const Color(0xFF110F0B),
     surfaceContainerHighest: AppColors.surfaceVariantDark,
-    outline: AppColors.cardBorderDark,
-    outlineVariant: const Color(0xFF2A251F),
+    outline: AppColors.outlineDark,
+    outlineVariant: const Color(0xFF4A4238),
     shadow: const Color(0x33000000),
     surfaceTint: const Color(0xFFB8892F),
     error: const Color(0xFFD07A72),
@@ -161,7 +161,9 @@ class AppTheme {
 
     final borderSide = BorderSide(color: borderColor);
     // 暗色模式：用色阶差代替边框，去除后台管理系统感
-    final cardBorderSide = brightness == Brightness.dark ? BorderSide.none : borderSide;
+    final cardBorderSide = brightness == Brightness.dark
+        ? BorderSide.none
+        : BorderSide(color: borderColor, width: 0.5);
 
     return base.copyWith(
       appBarTheme: AppBarTheme(
@@ -357,10 +359,16 @@ class AppTheme {
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
-        backgroundColor: scheme.surfaceContainerHighest,
-        selectedColor: accentSoft,
+        backgroundColor: Colors.transparent,
+        selectedColor: scheme.primary.withValues(alpha: 0.12),
         disabledColor: brightness == Brightness.light ? AppColors.disabled : AppColors.disabledDark,
-        side: cardBorderSide,
+        checkmarkColor: scheme.primary,
+        side: WidgetStateBorderSide.resolveWith((states) {
+          if (states.contains(WidgetState.selected)) {
+            return BorderSide(color: scheme.primary, width: 1.5);
+          }
+          return BorderSide(color: scheme.outlineVariant);
+        }),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.md),
         ),

@@ -14,18 +14,30 @@ class CaptureSessionGroup extends StatelessWidget {
   /// contactId → contactName 映射，用于渲染关联联系人姓名。
   final Map<String, String> contactNames;
 
+  /// eventId → eventTitle 映射，用于渲染关联事件标题。
+  final Map<String, String> eventTitles;
+
   /// 删除笔记回调（传入 noteId）。
   final void Function(String noteId)? onDeleteNote;
 
   /// 清除笔记 topics 回调（传入 noteId）。
   final void Function(String noteId)? onClearTopics;
 
+  /// 点击联系人 chip（传入 contactId）。
+  final void Function(String contactId)? onContactTap;
+
+  /// 点击事件 chip（传入 eventId）。
+  final void Function(String eventId)? onEventTap;
+
   const CaptureSessionGroup({
     super.key,
     required this.session,
     this.contactNames = const {},
+    this.eventTitles = const {},
     this.onDeleteNote,
     this.onClearTopics,
+    this.onContactTap,
+    this.onEventTap,
   });
 
   @override
@@ -119,11 +131,18 @@ class CaptureSessionGroup extends StatelessWidget {
                           (note) => NoteCard(
                             note: note,
                             linkedContactName: _contactName(note),
+                            linkedEventTitle: _eventTitle(note),
                             onDelete: onDeleteNote != null
                                 ? () => onDeleteNote!(note.id)
                                 : null,
                             onClearTopics: onClearTopics != null
                                 ? () => onClearTopics!(note.id)
+                                : null,
+                            onContactTap: (onContactTap != null && note.linkedContactId != null)
+                                ? () => onContactTap!(note.linkedContactId!)
+                                : null,
+                            onEventTap: (onEventTap != null && note.linkedEventId != null)
+                                ? () => onEventTap!(note.linkedEventId!)
                                 : null,
                           ),
                         )
@@ -141,6 +160,11 @@ class CaptureSessionGroup extends StatelessWidget {
   String? _contactName(QuickNote note) {
     if (note.linkedContactId == null) return null;
     return contactNames[note.linkedContactId];
+  }
+
+  String? _eventTitle(QuickNote note) {
+    if (note.linkedEventId == null) return null;
+    return eventTitles[note.linkedEventId];
   }
 
   /// 从会话内任意笔记的 aiMetadata 中取 sessionLabel（取第一个非 null 值）。

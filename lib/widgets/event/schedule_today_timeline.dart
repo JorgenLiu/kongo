@@ -243,7 +243,7 @@ class _CollapsedHourRange extends StatelessWidget {
     final hourCount = endHour - startHour + 1;
     final label = hourCount == 1
         ? '${startHour.toString().padLeft(2, '0')}:00 无安排'
-        : '${startHour.toString().padLeft(2, '0')}:00 – ${(endHour + 1).toString().padLeft(2, '0')}:00 无安排（$hourCount 小时）';
+        : '${startHour.toString().padLeft(2, '0')}:00 – ${(endHour + 1).toString().padLeft(2, '0')}:00 无安排';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
@@ -445,7 +445,6 @@ class _TimelineEventCard extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: colorScheme.outlineVariant),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

@@ -6,6 +6,7 @@ import '../../ai/openai_compatible_provider.dart';
 import '../../config/ai_config_store.dart';
 import '../../config/app_constants.dart';
 import '../../services/ai_secret_store.dart';
+import '../../services/settings_preferences_store.dart';
 
 /// 为“测试连接”动作构建一次性 provider。
 ///
@@ -52,6 +53,7 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
   bool _apiKeySaved = false;
   bool _secretSupported = true;
   String _cachedApiKey = '';
+  bool _quickCaptureAiEnabled = false;
 
   @override
   void initState() {
@@ -77,9 +79,10 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
     final preset = kAiPresets[_selectedPreset]!;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        child: Column(
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -227,10 +230,28 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
               '配置保存后将在下次启动时自动接入 AI 服务；连接测试立即生效。',
               style: textTheme.bodySmall?.copyWith(color: colorScheme.outline),
             ),
+            const SizedBox(height: AppSpacing.sm),
+            SwitchListTile(
+              key: const Key('aiSettingsQuickCaptureAiToggle'),
+              title: Text('快速捕获使用 AI', style: textTheme.bodyMedium),
+              subtitle: Text(
+                '当 AI 可用时，优先使用 AI 解析快速捕获内容。',
+                style: textTheme.bodySmall?.copyWith(color: colorScheme.outline),
+              ),
+              value: _quickCaptureAiEnabled,
+              onChanged: (enabled) async {
+                setState(() {
+                  _quickCaptureAiEnabled = enabled;
+                });
+                try {
+                  await context.read<SettingsPreferencesStore>().setQuickCaptureAiEnabled(enabled);
+                } catch (_) {}
+              },
+            ),
           ],
         ),
       ),
-    );
+    ));
   }
 
   Future<void> _loadSettings() async {
@@ -259,6 +280,16 @@ class _AiSettingsSectionState extends State<AiSettingsSection> {
       _modelController.text = settings.resolvedModel;
       _loading = false;
     });
+
+    try {
+      final prefs = context.read<SettingsPreferencesStore>();
+      final enabled = await prefs.getQuickCaptureAiEnabled();
+      if (mounted) {
+        setState(() {
+          _quickCaptureAiEnabled = enabled;
+        });
+      }
+    } catch (_) {}
   }
 
   void _handlePresetChanged(AiPresetProvider? nextPreset) {

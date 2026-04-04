@@ -377,7 +377,6 @@ class _MetaPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: AppOpacity.elevated),
         borderRadius: BorderRadius.circular(AppRadius.sm),
-        border: Border.all(color: borderColor ?? colorScheme.outlineVariant),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

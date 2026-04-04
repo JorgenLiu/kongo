@@ -98,9 +98,22 @@ class DefaultHomeReadService implements HomeReadService {
     final allContacts = await _contactRepository.getAll();
     final totalContacts = allContacts.length;
 
-    // 今日笔记数
+    // 今日笔记数 + 相关联系人名
     final todayNotes = await _quickNoteRepository.findByDate(todayStart);
     final todayNotesCount = todayNotes.length;
+    final noteContactIds = todayNotes
+        .map((n) => n.linkedContactId)
+        .whereType<String>()
+        .toSet()
+        .take(3)
+        .toList();
+    final todayNoteContactNames = <String>[];
+    for (final id in noteContactIds) {
+      try {
+        final c = await _contactRepository.getById(id);
+        todayNoteContactNames.add(c.name);
+      } catch (_) {}
+    }
 
     return HomeReadModel(
       todayEvents: todayEvents
@@ -120,6 +133,7 @@ class DefaultHomeReadService implements HomeReadService {
       totalContacts: totalContacts,
       todayEventCount: todayEvents.length,
       todayNotesCount: todayNotesCount,
+      todayNoteContactNames: todayNoteContactNames,
     );
   }
 
@@ -151,6 +165,7 @@ class HomeReadModel {
   final int totalContacts;
   final int todayEventCount;
   final int todayNotesCount;
+  final List<String> todayNoteContactNames;
 
   const HomeReadModel({
     required this.todayEvents,
@@ -162,6 +177,7 @@ class HomeReadModel {
     required this.totalContacts,
     required this.todayEventCount,
     this.todayNotesCount = 0,
+    this.todayNoteContactNames = const [],
   });
 }
 

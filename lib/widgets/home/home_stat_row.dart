@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 
 class HomeStatRow extends StatelessWidget {
@@ -40,6 +41,7 @@ class HomeStatRow extends StatelessWidget {
           icon: Icons.checklist_outlined,
           label: '待处理 $pendingActionCount 项',
           subdued: pendingActionCount == 0,
+          urgent: pendingActionCount > 0,
           onTap: onPendingActionsTap,
         ),
       ],
@@ -51,12 +53,14 @@ class _StatChip extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool subdued;
+  final bool urgent;
   final VoidCallback? onTap;
 
   const _StatChip({
     required this.icon,
     required this.label,
     this.subdued = false,
+    this.urgent = false,
     this.onTap,
   });
 
@@ -70,7 +74,6 @@ class _StatChip extends StatelessWidget {
             ? colorScheme.surfaceContainerLow
             : colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -80,6 +83,16 @@ class _StatChip extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (urgent) ...[                Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: AppColors.warning,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xs),
+            ],
             Icon(
               icon,
               size: 16,

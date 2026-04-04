@@ -158,12 +158,12 @@ class _WeekDayCard extends StatelessWidget {
                         ? colorScheme.primaryContainer
                         : colorScheme.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(AppRadius.lg),
-                    border: Border.all(
-                      color: selected
-                          ? colorScheme.primary
-                              .withValues(alpha: AppOpacity.medium)
-                          : colorScheme.outline.withValues(alpha: 0.22),
-                    ),
+                    border: selected
+                        ? Border.all(
+                            color: colorScheme.primary
+                                .withValues(alpha: AppOpacity.medium),
+                          )
+                        : null,
                   ),
                   child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -198,7 +198,9 @@ class _WeekDayCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: AppSpacing.xs),
+                const Divider(height: 1),
+                const SizedBox(height: AppSpacing.sm),
                 if (calendarTimeNodes.isNotEmpty) ...[
                   Wrap(
                     spacing: AppSpacing.xs,
@@ -219,12 +221,14 @@ class _WeekDayCard extends StatelessWidget {
                   const SizedBox(height: AppSpacing.sm),
                 ],
                 if (displayItems.isEmpty)
-                  Text(
-                    items.isEmpty ? '暂无日程' : '${items.length} 个日程',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                  )
+                  items.isEmpty
+                      ? const SizedBox(height: 20)
+                      : Text(
+                          '${items.length} 个日程',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                        )
                 else
                   ...displayItems.map(
                     (item) => Padding(
@@ -398,14 +402,18 @@ class _WeekScheduleSnippet extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                 ),
-              Text(
-                item.event.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
+              Tooltip(
+                message: item.event.title,
+                waitDuration: const Duration(milliseconds: 300),
+                child: Text(
+                  item.event.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
               ),
             ],
           ),

@@ -8,7 +8,6 @@ import 'package:kongo/config/ai_config_store.dart';
 import 'package:kongo/main.dart';
 import 'package:kongo/models/attachment.dart';
 import 'package:kongo/models/event.dart';
-import 'package:kongo/providers/contact_detail_provider.dart';
 import 'package:kongo/providers/calendar_time_node_settings_provider.dart';
 import 'package:kongo/providers/home_provider.dart';
 import 'package:kongo/providers/notes_provider.dart';
@@ -114,23 +113,18 @@ Future<void> waitForNotesOverviewReady(WidgetTester tester) async {
 }
 
 Future<void> waitForContactDetailReady(WidgetTester tester) async {
-  final titleFinder = find.text('联系人详情');
-  await pumpUntilFound(tester, titleFinder);
-  final context = tester.element(titleFinder);
-  final provider = Provider.of<ContactDetailProvider>(context, listen: false);
+  final sectionFinder = find.text('联系信息');
   for (var attempt = 0; attempt < 100; attempt++) {
-    if (!provider.loading && provider.data != null) {
-      await tester.pump();
-      return;
-    }
-
     await tester.runAsync(() async {
       await Future<void>.delayed(const Duration(milliseconds: 10));
     });
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    if (sectionFinder.evaluate().isNotEmpty) {
+      return;
+    }
   }
 
-  fail('Timed out waiting for contact detail provider to settle');
+  fail('Timed out waiting for contact detail to load');
 }
 
 void main() {
@@ -251,11 +245,10 @@ void main() {
 
       await tester.tap(find.byType(ContactCard).first);
       await tester.pump();
-      await pumpUntilFound(tester, find.text('联系人详情'));
       await waitForContactDetailReady(tester);
 
       expect(find.text('Kongo'), findsOneWidget);
-      expect(find.text('联系人详情'), findsOneWidget);
+      expect(find.text('联系信息'), findsOneWidget);
 
       await drainPendingDatabaseTimers(tester);
     } finally {
@@ -328,7 +321,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
 
-      expect(find.text('新建联系人'), findsOneWidget);
+      expect(find.byKey(const Key('contactForm_nameField')), findsOneWidget);
 
       await tester.tap(find.byIcon(Icons.edit_note_outlined).last, warnIfMissed: false);
       await tester.pump();

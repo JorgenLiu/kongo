@@ -170,8 +170,7 @@ class _DateTimeRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.md),
                 child: InputDecorator(
                   decoration: const InputDecoration(
-                    labelText: '日期',
-                    hintText: '选择日期',
+                    hintText: '年/月/日',
                     suffixIcon: Icon(Icons.calendar_month_outlined),
                   ),
                   child: Text(
@@ -190,8 +189,7 @@ class _DateTimeRow extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppRadius.md),
                 child: InputDecorator(
                   decoration: const InputDecoration(
-                    labelText: '时间',
-                    hintText: '选择时间',
+                    hintText: 'HH:MM',
                     suffixIcon: Icon(Icons.access_time_outlined),
                   ),
                   child: Text(

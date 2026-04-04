@@ -15,7 +15,9 @@ import '../../widgets/common/search_bar.dart' as custom_search;
 import 'files_overview_actions.dart';
 
 class FilesOverviewScreen extends StatefulWidget {
-  const FilesOverviewScreen({super.key});
+  final String? scopeLabel;
+
+  const FilesOverviewScreen({super.key, this.scopeLabel});
 
   @override
   State<FilesOverviewScreen> createState() => _FilesOverviewScreenState();
@@ -58,8 +60,8 @@ class _FilesOverviewScreenState extends State<FilesOverviewScreen> {
                     AppSpacing.md,
                   ),
                   child: WorkbenchPageHeader(
-                    eyebrow: 'Files',
-                    title: '文件',
+                    eyebrow: widget.scopeLabel != null ? '相关附件' : 'Files',
+                    title: widget.scopeLabel ?? '文件',
                     titleKey: const Key('filesPageHeaderTitle'),
                     trailing: _buildHeaderActions(context, provider),
                   ),
@@ -116,7 +118,9 @@ class _FilesOverviewScreenState extends State<FilesOverviewScreen> {
         message: provider.keyword.isEmpty &&
                 provider.activeStorageFilter == FilesLibraryStorageFilter.all &&
                 !provider.missingSourceOnly
-            ? '暂无文件，事件和总结中的附件会集中显示在这里'
+            ? (provider.isScopedMode
+                ? '当前没有相关附件'
+                : '暂无文件，事件和总结中的附件会集中显示在这里')
             : '未找到匹配的文件',
       );
     }
@@ -156,7 +160,7 @@ class _FilesOverviewScreenState extends State<FilesOverviewScreen> {
   Widget? _buildHeaderActions(BuildContext context, FilesProvider provider) {
     final actions = <Widget>[];
 
-    if (!provider.selectionMode && provider.orphanFileCount > 0) {
+    if (!provider.selectionMode && provider.orphanFileCount > 0 && !provider.isScopedMode) {
       actions.add(
         FilledButton.tonalIcon(
           onPressed: () => cleanupOrphanFilesFromLibrary(context),

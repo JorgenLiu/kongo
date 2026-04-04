@@ -207,4 +207,9 @@ class _NoopSettingsPreferencesStore implements SettingsPreferencesStore {
   Future<void> setThemeMode(ThemeMode mode) {
     throw UnimplementedError();
   }
+  @override
+  Future<bool> getQuickCaptureAiEnabled() async => false;
+
+  @override
+  Future<void> setQuickCaptureAiEnabled(bool enabled) async {}
 }

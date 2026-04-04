@@ -3,6 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../config/app_constants.dart';
 import '../../providers/global_search_provider.dart';
+import '../../repositories/info_tag_repository.dart';
+import '../../repositories/quick_note_repository.dart';
+import '../../services/attachment_service.dart';
 import '../../services/contact_service.dart';
 import '../../services/read/event_read_service.dart';
 import '../../services/summary_service.dart';
@@ -25,6 +28,9 @@ class GlobalSearchScreen extends StatelessWidget {
         context.read<ContactService>(),
         context.read<EventReadService>(),
         context.read<SummaryService>(),
+        context.read<AttachmentService>(),
+        context.read<QuickNoteRepository>(),
+        infoTagRepository: context.read<InfoTagRepository>(),
       ),
       child: const _GlobalSearchView(),
     );
@@ -92,7 +98,7 @@ class _GlobalSearchViewState extends State<_GlobalSearchView> {
             ),
             custom_search.SearchBar(
               controller: _searchController,
-              hintText: '搜索联系人、日程、地点、总结内容...',
+              hintText: '搜索联系人、日程、地点、总结内容、文件、记录...',
               onChanged: _handleSearchChanged,
               onClear: _handleSearchClear,
             ),
@@ -170,9 +176,14 @@ class _GlobalSearchViewState extends State<_GlobalSearchView> {
           contacts: provider.contacts,
           events: provider.events,
           summaries: provider.summaries,
+          attachments: provider.attachments,
+          notes: provider.notes,
+          contactsByInfoTag: provider.contactsByInfoTag,
           onContactTap: (contact) => openGlobalSearchContact(context, contact),
           onEventTap: (item) => openGlobalSearchEvent(context, item),
           onSummaryTap: (summary) => openGlobalSearchSummary(context, summary),
+          onAttachmentTap: (attachment) => openGlobalSearchAttachment(context, attachment),
+          onNoteTap: (note) => openGlobalSearchNote(context, note),
         ),
       ],
     );

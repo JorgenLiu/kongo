@@ -151,19 +151,21 @@ class _TodoItemFormSheetState extends State<_TodoItemFormSheet> {
                   maxLength: FormFieldLimits.notes,
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
-              SegmentedButton<TodoItemStatus>(
-                segments: const [
-                  ButtonSegment(value: TodoItemStatus.pending, label: Text('待处理')),
-                  ButtonSegment(value: TodoItemStatus.completed, label: Text('已完成')),
-                ],
-                selected: {_status},
-                onSelectionChanged: (selection) {
-                  setState(() {
-                    _status = selection.first;
-                  });
-                },
-              ),
+              if (!isNew) ...[
+                const SizedBox(height: AppSpacing.md),
+                SegmentedButton<TodoItemStatus>(
+                  segments: const [
+                    ButtonSegment(value: TodoItemStatus.pending, label: Text('待处理')),
+                    ButtonSegment(value: TodoItemStatus.completed, label: Text('已完成')),
+                  ],
+                  selected: {_status},
+                  onSelectionChanged: (selection) {
+                    setState(() {
+                      _status = selection.first;
+                    });
+                  },
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
               TodoContactSelectionSection(
                 contacts: _availableContacts,

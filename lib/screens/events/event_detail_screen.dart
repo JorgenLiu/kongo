@@ -5,6 +5,7 @@ import '../../config/app_constants.dart';
 import '../../models/event.dart';
 import '../../providers/event_detail_provider.dart';
 import '../../services/read/event_read_service.dart';
+import '../../services/read/notes_read_service.dart';
 import '../../services/read/todo_read_service.dart';
 import '../../widgets/common/detail_skeleton.dart';
 import '../../widgets/common/error_state.dart';
@@ -14,6 +15,7 @@ import '../../widgets/event/event_detail_header.dart';
 import '../../widgets/event/event_detail_info_section.dart';
 import '../../widgets/event/event_detail_participants_section.dart';
 import '../../widgets/event/event_post_event_follow_up_card.dart';
+import '../../widgets/notes/linked_notes_section.dart';
 import '../../widgets/todo/related_todo_section.dart';
 import 'event_detail_actions.dart';
 import '../todos/todo_link_actions.dart';
@@ -35,6 +37,7 @@ class EventDetailScreen extends StatelessWidget {
         context.read<EventReadService>(),
         context.read<TodoReadService>(),
         eventId,
+        notesReadService: context.read<NotesReadService>(),
       )..load(),
       child: _EventDetailView(preferPostEventFollowUp: preferPostEventFollowUp),
     );
@@ -148,6 +151,9 @@ class _EventDetailView extends StatelessWidget {
                   const SizedBox(height: AppSpacing.lg),
                   EventDetailAttachmentsSection(
                     attachments: data.attachments,
+                    onOpenInLibrary: data.attachments.isNotEmpty
+                        ? () => openEventFilesLibrary(context, event: data.event)
+                        : null,
                     onAddAttachment: () =>
                         addEventAttachment(context, event: data.event),
                     onOpenAttachment: (attachment) => openEventAttachment(
@@ -175,6 +181,10 @@ class _EventDetailView extends StatelessWidget {
                     onCreate: () => createTodoFromEventDetailAction(context, data.event),
                     onOpenGroup: (item) => openTodoBoardForGroupAction(context, item.group.id),
                   ),
+                  if (provider.linkedNotes.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    LinkedNotesSection(notes: provider.linkedNotes),
+                  ],
                 ],
               ),
             ],

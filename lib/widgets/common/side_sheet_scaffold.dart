@@ -67,8 +67,8 @@ class SideSheetScaffold extends StatelessWidget {
               ],
             ),
           ),
-          // 内容区
-          Expanded(child: body),
+          // 内容区（可滚动）
+          Expanded(child: SingleChildScrollView(child: body)),
         ],
       ),
     );

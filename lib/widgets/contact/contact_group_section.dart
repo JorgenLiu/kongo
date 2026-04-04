@@ -9,8 +9,8 @@ class ContactGroupSection extends StatelessWidget {
   final List<Contact> contacts;
   final Key? headerKey;
   final ValueChanged<Contact> onTap;
-  final ValueChanged<Contact> onEdit;
-  final ValueChanged<Contact> onDelete;
+  final ValueChanged<Contact>? onEdit;
+  final ValueChanged<Contact>? onDelete;
 
   const ContactGroupSection({
     super.key,
@@ -18,8 +18,8 @@ class ContactGroupSection extends StatelessWidget {
     required this.contacts,
     this.headerKey,
     required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
   });
 
   @override
@@ -65,8 +65,8 @@ class ContactGroupSection extends StatelessWidget {
             child: ContactCard(
               contact: contact,
               onTap: () => onTap(contact),
-              onEdit: () => onEdit(contact),
-              onDelete: () => onDelete(contact),
+              onEdit: onEdit != null ? () => onEdit!(contact) : null,
+              onDelete: onDelete != null ? () => onDelete!(contact) : null,
             ),
           ),
         ),

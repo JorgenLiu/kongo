@@ -252,7 +252,6 @@ class _ParticipantResultCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.outlineVariant),
       ),
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
@@ -308,7 +307,6 @@ class _ParticipantResultCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           color: colorScheme.surface,
                           borderRadius: BorderRadius.circular(AppRadius.sm),
-                          border: Border.all(color: colorScheme.outlineVariant),
                         ),
                         child: Text(
                           tagName,
@@ -355,7 +353,6 @@ class _SelectedParticipantCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

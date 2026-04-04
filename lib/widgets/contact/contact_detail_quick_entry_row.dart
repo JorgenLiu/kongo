@@ -73,7 +73,6 @@ class _ContactDetailEntryCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: colorScheme.surface,
           borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: colorScheme.outlineVariant),
         ),
         child: Row(
           children: [

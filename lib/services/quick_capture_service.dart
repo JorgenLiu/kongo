@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,12 +14,14 @@ abstract class QuickCaptureService {
   /// 存储一条经过解析的 note，可携带联系人关联和 noteType。
   /// [linkedContactId] 非 null 时关联到已有联系人.
   /// [noteType] 默认 'knowledge'；关联联系人后传 'structured'.
+  /// [aiMetadata] AI 解析结果，序列化后写入 aiMetadata 字段。
   /// 内容 trim 后为空则忽略。
   Future<void> saveNote(
     String content, {
     String? linkedContactId,
     String? linkedEventId,
     String noteType = 'knowledge',
+    Map<String, dynamic>? aiMetadata,
   });
 
   /// 软删除笔记（设置 deletedAt）。
@@ -59,6 +63,7 @@ class DefaultQuickCaptureService implements QuickCaptureService {
     String? linkedContactId,
     String? linkedEventId,
     String noteType = 'knowledge',
+    Map<String, dynamic>? aiMetadata,
   }) async {
     final trimmed = content.trim();
     if (trimmed.isEmpty) return;
@@ -78,7 +83,7 @@ class DefaultQuickCaptureService implements QuickCaptureService {
         'linkedContactId': linkedContactId,
         'linkedEventId': linkedEventId,
         'sessionGroup': _resolveSessionGroup(now),
-        'aiMetadata': null,
+        'aiMetadata': aiMetadata != null ? json.encode(aiMetadata) : null,
         'enrichedAt': null,
         'captureDate': captureDate,
         'createdAt': nowIso,

@@ -72,12 +72,12 @@ class _LabeledDropdown<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+    final textStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
           color: colorScheme.onSurface,
           fontWeight: FontWeight.w600,
         );
     return DropdownMenu<T>(
-      width: 160,
+      width: 140,
       initialSelection: value,
       label: Text(label),
       requestFocusOnTap: false,

@@ -32,6 +32,7 @@ class _TodoContactSelectionSectionState
     extends State<TodoContactSelectionSection> {
   late final TextEditingController _searchController;
   String? _selectedTagName;
+  bool _tagsExpanded = false;
 
   @override
   void initState() {
@@ -133,7 +134,7 @@ class _TodoContactSelectionSectionState
                         });
                       },
                     ),
-                    ...widget.tags.map(
+                    ...(_tagsExpanded ? widget.tags : widget.tags.take(5)).map(
                       (tag) => ChoiceChip(
                         key: Key('todoContact_filter_${tag.id}'),
                         label: Text(tag.name),
@@ -147,6 +148,13 @@ class _TodoContactSelectionSectionState
                         },
                       ),
                     ),
+                    if (!_tagsExpanded && widget.tags.length > 5)
+                      ActionChip(
+                        label: Text('+${widget.tags.length - 5}'),
+                        onPressed: () => setState(() => _tagsExpanded = true),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
                   ],
                 ),
               ],

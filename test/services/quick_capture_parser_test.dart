@@ -59,14 +59,22 @@ void main() {
   });
 
   group('edit distance 1 fuzzy match', () {
-    test('input with one differing character fuzzy-matches at 0.8 score', () {
+    test('2-char names with only 1 char matching do NOT fuzzy-match (prevents false surname matches)', () {
       final contacts = [makeContact('张伟')];
-      // "张为" → 编辑距离1 与 "张伟" 相同
+      // "张为" shares only the surname with "张伟" — too risky for 2-char names,
+      // so we require both chars to match (samePos >= 2). No structured hit.
       final result = parser.parse('今天见了张为，讨论了合同条款', contacts);
 
-      expect(result.noteType, QuickNoteType.structured);
-      expect(result.matchedContact?.name, '张伟');
-      expect(result.matchConfidence, 0.8);
+      expect(result.matchedContact, isNull);
+      expect(result.noteType, QuickNoteType.knowledge);
+    });
+
+    test('bigram dice does not false-match unrelated 2-char substring', () {
+      final contacts = [makeContact('张伟')];
+      // "项目" 与 "张伟" bigram dice = 0，不应命中
+      final result = parser.parse('今天讨论了项目进展', contacts);
+
+      expect(result.matchedContact, isNull);
     });
   });
 
@@ -86,6 +94,16 @@ void main() {
       expect(result.candidateNewName, '陈小明');
     });
 
+    test('four-character compound surname name is recognized', () {
+      final result = parser.parse('昨天见了欧阳明华', []);
+      expect(result.candidateNewName, '欧阳明华');
+    });
+
+    test('four-character non-compound-surname truncated to 3 chars', () {
+      final result = parser.parse('今天见了陈大明哥', []);
+      expect(result.candidateNewName, '陈大明');
+    });
+
     test('stopwords like "今天" are not treated as candidate names', () {
       final result = parser.parse('今天很忙，完成了很多工作，继续努力', []);
 
@@ -96,6 +114,38 @@ void main() {
     test('stopwords like "会议" are not treated as candidate names', () {
       final result = parser.parse('会议结束了', []);
       expect(result.candidateNewName, isNull);
+    });
+  });
+
+  group('expanded trigger words', () {
+    test('打电话给 triggers name extraction', () {
+      final result = parser.parse('打电话给李明，问一下进度', []);
+      expect(result.candidateNewName, '李明');
+    });
+
+    test('发消息给 triggers name extraction', () {
+      final result = parser.parse('发消息给王磊，确认时间', []);
+      expect(result.candidateNewName, '王磊');
+    });
+
+    test('聊到 triggers name extraction', () {
+      final result = parser.parse('开会时聊到赵刚', []);
+      expect(result.candidateNewName, '赵刚');
+    });
+
+    test('遇到 triggers name extraction', () {
+      final result = parser.parse('路上遇到张华，聊了几句', []);
+      expect(result.candidateNewName, '张华');
+    });
+
+    test('碰到 triggers name extraction', () {
+      final result = parser.parse('下楼碰到林涛', []);
+      expect(result.candidateNewName, '林涛');
+    });
+
+    test('告诉 triggers name extraction', () {
+      final result = parser.parse('告诉刘洋，明天开会', []);
+      expect(result.candidateNewName, '刘洋');
     });
   });
 
@@ -110,6 +160,22 @@ void main() {
     test('single title-case word is also recognized', () {
       final result = parser.parse('Talked with Sarah about Q3 roadmap', []);
       expect(result.candidateNewName, 'Sarah');
+    });
+
+    test('sentence-start name followed by verb is extracted', () {
+      final result = parser.parse('John called me about the project', []);
+      expect(result.candidateNewName, 'John');
+    });
+
+    test('sentence-start full name followed by verb is extracted', () {
+      final result = parser.parse('John Smith called me about the project', []);
+      expect(result.candidateNewName, 'John Smith');
+    });
+
+    test('sentence-start word not followed by verb is skipped', () {
+      final result = parser.parse('Meeting with the team went well', []);
+      // "Meeting" is at start but "with" is not in verb list
+      expect(result.candidateNewName, isNull);
     });
   });
 
@@ -143,6 +209,53 @@ void main() {
     test('noteContent matches trimmed input', () {
       final result = parser.parse('  今天见了张三  ', [makeContact('张三')]);
       expect(result.noteContent, '今天见了张三');
+    });
+  });
+
+  // ──────────────────── nerHints 支持 ────────────────────
+
+  group('nerHints from platform NER', () {
+    test('nerHints overrides regex extraction when no fuzzy match', () {
+      final result = parser.parse(
+        '刚才跟Alice聊了项目',
+        [],
+        nerHints: ['Alice'],
+      );
+
+      expect(result.noteType, QuickNoteType.knowledge);
+      expect(result.candidateNewName, 'Alice');
+    });
+
+    test('nerHints is ignored when fuzzy match succeeds', () {
+      final contacts = [makeContact('张三')];
+      final result = parser.parse(
+        '今天见了张三',
+        contacts,
+        nerHints: ['李四'],
+      );
+
+      expect(result.noteType, QuickNoteType.structured);
+      expect(result.matchedContact?.name, '张三');
+      expect(result.candidateNewName, isNull);
+    });
+
+    test('empty nerHints falls back to regex extraction', () {
+      final result = parser.parse(
+        '今天见了王伟，讨论了新方案',
+        [],
+        nerHints: [],
+      );
+
+      expect(result.candidateNewName, '王伟');
+    });
+
+    test('null nerHints falls back to regex extraction', () {
+      final result = parser.parse(
+        '今天见了王伟，讨论了新方案',
+        [],
+      );
+
+      expect(result.candidateNewName, '王伟');
     });
   });
 }

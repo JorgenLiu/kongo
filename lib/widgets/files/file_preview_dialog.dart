@@ -197,7 +197,6 @@ class _PreviewPane extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
       ),
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: Column(
@@ -251,7 +250,6 @@ class _DetailsPane extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: colorScheme.outlineVariant),
       ),
       padding: const EdgeInsets.all(AppSpacing.lg),
       child: ListView(
@@ -283,7 +281,6 @@ class _DetailsPane extends StatelessWidget {
             decoration: BoxDecoration(
               color: colorScheme.surface,
               borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: colorScheme.outlineVariant),
             ),
             child: Text(
               previewText == null || previewText!.isEmpty ? '当前没有可展示的预览文本。' : previewText!,

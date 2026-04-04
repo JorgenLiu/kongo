@@ -2,6 +2,7 @@ import 'dart:async';
 
 import '../exceptions/app_exception.dart';
 import '../models/attachment.dart';
+import '../models/attachment_link.dart';
 import '../services/attachment_service.dart';
 import 'base_provider.dart';
 
@@ -13,12 +14,23 @@ enum FilesLibrarySort {
   fileSizeDesc,
 }
 
+class FilesScope {
+  final AttachmentOwnerType ownerType;
+  final List<String> ownerIds;
+
+  const FilesScope({required this.ownerType, required this.ownerIds});
+}
+
 class FilesProvider extends BaseProvider {
   final AttachmentService _attachmentService;
   final bool _enableBackgroundPreviewWarmup;
+  final FilesScope? _scope;
 
-  FilesProvider(this._attachmentService, {bool enableBackgroundPreviewWarmup = true})
-      : _enableBackgroundPreviewWarmup = enableBackgroundPreviewWarmup;
+  FilesProvider(this._attachmentService, {
+    bool enableBackgroundPreviewWarmup = true,
+    FilesScope? scope,
+  })  : _enableBackgroundPreviewWarmup = enableBackgroundPreviewWarmup,
+       _scope = scope;
 
   List<Attachment> _allFiles = const [];
   List<Attachment> _files = const [];
@@ -46,6 +58,7 @@ class FilesProvider extends BaseProvider {
     bool get allVisibleSelected =>
       files.isNotEmpty && files.every((attachment) => _selectedAttachmentIds.contains(attachment.id));
   int get orphanFileCount => _allFiles.where((attachment) => linkCountFor(attachment.id) == 0).length;
+  bool get isScopedMode => _scope != null;
 
   Future<void> loadFiles() async {
     await execute(() async {
@@ -56,7 +69,11 @@ class FilesProvider extends BaseProvider {
       _selectionMode = false;
       _selectedAttachmentIds = <String>{};
       _refreshingPreviewIds = <String>{};
-      _allFiles = await _attachmentService.getAllAttachments();
+      if (_scope != null) {
+        _allFiles = await _loadScopedFiles(_scope);
+      } else {
+        _allFiles = await _attachmentService.getAllAttachments();
+      }
       _linkCounts = await _loadLinkCounts(_allFiles);
       _applyFilters(notify: false);
       markInitialized();
@@ -270,7 +287,11 @@ class FilesProvider extends BaseProvider {
   }
 
   Future<void> _reloadFiles() async {
-    _allFiles = await _attachmentService.getAllAttachments();
+    if (_scope != null) {
+      _allFiles = await _loadScopedFiles(_scope);
+    } else {
+      _allFiles = await _attachmentService.getAllAttachments();
+    }
     _linkCounts = await _loadLinkCounts(_allFiles);
     final validIds = _allFiles.map((attachment) => attachment.id).toSet();
     _selectedAttachmentIds = _selectedAttachmentIds.where(validIds.contains).toSet();
@@ -279,6 +300,27 @@ class FilesProvider extends BaseProvider {
     }
     _applyFilters(notify: false);
     markInitialized();
+  }
+
+  Future<List<Attachment>> _loadScopedFiles(FilesScope scope) async {
+    switch (scope.ownerType) {
+      case AttachmentOwnerType.event:
+        final byEvent = await _attachmentService
+            .getEventAttachmentsByEventIds(scope.ownerIds);
+        final seen = <String>{};
+        return byEvent.values
+            .expand((list) => list)
+            .where((a) => seen.add(a.id))
+            .toList();
+      case AttachmentOwnerType.summary:
+        final bySummary = await _attachmentService
+            .getSummaryAttachmentsBySummaryIds(scope.ownerIds);
+        final seen = <String>{};
+        return bySummary.values
+            .expand((list) => list)
+            .where((a) => seen.add(a.id))
+            .toList();
+    }
   }
 
   Future<Map<String, int>> _loadLinkCounts(List<Attachment> attachments) async {

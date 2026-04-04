@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 
+import '../../config/app_colors.dart';
 import '../../config/app_constants.dart';
 import '../../models/contact.dart';
 import '../../models/contact_draft.dart';
@@ -149,6 +150,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
                       hintText: '请输入联系人姓名',
                     ),
                     textInputAction: TextInputAction.next,
+                    buildCounter: _counterWidget,
                     validator: (value) => FormInputValidators.requiredText(
                       value,
                       fieldName: '姓名',
@@ -166,6 +168,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
                     ),
                     keyboardType: TextInputType.phone,
                     textInputAction: TextInputAction.next,
+                    buildCounter: _counterWidget,
                     validator: FormInputValidators.phone,
                   ),
                   const SizedBox(height: AppSpacing.md),
@@ -178,8 +181,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
                       hintText: '请输入邮箱地址',
                     ),
                     keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    validator: FormInputValidators.email,
+                    textInputAction: TextInputAction.next,                    buildCounter: _counterWidget,                    validator: FormInputValidators.email,
                   ),
                   const SizedBox(height: AppSpacing.md),
                   TextFormField(
@@ -191,6 +193,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
                       hintText: '请输入地址',
                     ),
                     textInputAction: TextInputAction.next,
+                    buildCounter: _counterWidget,
                     validator: (value) => FormInputValidators.optionalText(
                       value,
                       fieldName: '地址',
@@ -208,8 +211,7 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
                       alignLabelWithHint: true,
                     ),
                     maxLines: 5,
-                    minLines: 3,
-                    validator: (value) => FormInputValidators.optionalText(
+                    minLines: 3,                    buildCounter: _counterWidget,                    validator: (value) => FormInputValidators.optionalText(
                       value,
                       fieldName: '备注',
                       maxLength: FormFieldLimits.notes,
@@ -350,5 +352,17 @@ class _ContactFormScreenState extends State<ContactFormScreen> {
       return true;
     }
     return !setEquals(_selectedTagIds, _initialTagIds);
+  }
+
+  Widget? _counterWidget(BuildContext context, {required int currentLength, required bool isFocused, required int? maxLength}) {
+    if (maxLength == null) return null;
+    final nearLimit = currentLength >= (maxLength * 0.9).round();
+    return Text(
+      '$currentLength / $maxLength',
+      style: TextStyle(
+        fontSize: 11,
+        color: nearLimit ? AppColors.warning : Theme.of(context).colorScheme.outline,
+      ),
+    );
   }
 }

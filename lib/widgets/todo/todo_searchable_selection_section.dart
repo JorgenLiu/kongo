@@ -138,7 +138,6 @@ class _TodoSearchableSelectionSectionState<T>
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: colorScheme.outlineVariant),
             ),
             child: Row(
               children: [
@@ -239,7 +238,6 @@ class _TodoSearchableSelectionSectionState<T>
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerLow,
               borderRadius: BorderRadius.circular(AppRadius.md),
-              border: Border.all(color: colorScheme.outlineVariant),
             ),
             child: Scrollbar(
               controller: _scrollController,
@@ -362,7 +360,6 @@ class _SelectedEntityCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: colorScheme.outlineVariant),
         ),
         child: Stack(
           children: [

@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'ai/ai_service.dart';
+import 'ai/ai_provider.dart';
 import 'config/ai_config_store.dart';
 import 'config/app_theme.dart';
 import 'models/contact_draft.dart';
@@ -23,7 +25,9 @@ import 'services/daily_brief_delivery_service.dart';
 import 'services/event_service.dart';
 import 'services/home_daily_brief_service.dart';
 import 'services/quick_capture_parser.dart';
+import 'services/quick_capture_router.dart';
 import 'services/quick_capture_service.dart';
+import 'services/attachment_service.dart';
 import 'services/quick_note_enrichment_service.dart';
 import 'services/read/contact_read_service.dart';
 import 'services/read/event_read_service.dart';
@@ -31,6 +35,8 @@ import 'services/read/home_read_service.dart';
 import 'services/read/notes_read_service.dart';
 import 'services/read/summary_read_service.dart';
 import 'services/read/todo_read_service.dart';
+import 'repositories/quick_note_repository.dart';
+import 'repositories/info_tag_repository.dart';
 import 'services/reminder_service.dart';
 import 'services/ai_secret_store.dart';
 import 'services/settings_preferences_store.dart';
@@ -135,6 +141,9 @@ class _MyAppState extends State<MyApp> {
           value: widget.dependencies.quickNoteEnrichmentService,
         ),
         Provider<NotesReadService>.value(value: widget.dependencies.notesReadService),
+        Provider<QuickNoteRepository>.value(value: widget.dependencies.quickNoteRepository),
+        Provider<InfoTagRepository>.value(value: widget.dependencies.infoTagRepository),
+        Provider<AttachmentService>.value(value: widget.dependencies.attachmentService),
       ],
       child: Consumer<ThemeNotifier>(
         builder: (context, themeNotifier, _) {
@@ -220,7 +229,15 @@ class _MyAppState extends State<MyApp> {
   Future<dynamic> _handleQuickCapture(MethodCall call) async {
     switch (call.method) {
       case 'parse':
-        return _handleParse(call.arguments as String? ?? '');
+        final args = call.arguments;
+        if (args is Map) {
+          final text = args['text'] as String? ?? '';
+          final nerHints = (args['nerHints'] as List?)?.cast<String>() ?? [];
+          final dateHints = (args['dateHints'] as List?)?.cast<String>() ?? [];
+          return _handleParse(text, nerHints: nerHints, dateHints: dateHints);
+        }
+        // 兼容旧版（纯字符串参数）
+        return _handleParse(args as String? ?? '');
       case 'save':
         await _handleSave(call.arguments as Map? ?? {});
         return null;
@@ -230,53 +247,23 @@ class _MyAppState extends State<MyApp> {
   }
 
   /// 解析输入文本，返回结构化 JSON 给 Swift 侧渲染确认 UI。
-  Future<Map<String, dynamic>> _handleParse(String text) async {
+  Future<Map<String, dynamic>> _handleParse(
+    String text, {
+    List<String> nerHints = const [],
+    List<String> dateHints = const [],
+  }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return {'hasContact': false, 'hasEvent': false};
 
-    final contacts = await widget.dependencies.contactService.getContacts();
-    final parser = QuickCaptureParser();
-    final result = parser.parse(trimmed, contacts);
-
-    final response = <String, dynamic>{};
-
-    // 联系人信息
-    if (result.matchedContact != null) {
-      response['hasContact'] = true;
-      response['contactType'] = 'matched';
-      response['contactName'] = result.matchedContact!.name;
-      response['contactId'] = result.matchedContact!.id;
-    } else if (result.candidateNewName != null) {
-      response['hasContact'] = true;
-      response['contactType'] = 'candidate';
-      response['contactName'] = result.candidateNewName!;
-    } else {
-      response['hasContact'] = false;
-    }
-
-    // 事件/时间信息
-    if (result.detectedDate != null) {
-      response['hasEvent'] = true;
-      response['eventDate'] = result.detectedDate!.toIso8601String();
-      response['eventTitle'] = result.suggestedEventTitle ?? trimmed;
-
-      // 查询同日已有事件
-      final existingEvents = await widget.dependencies.eventService
-          .getEventsByDate(result.detectedDate!);
-      if (existingEvents.isNotEmpty) {
-        response['existingEvents'] = existingEvents
-            .map((e) => {
-                  'id': e.id,
-                  'title': e.title,
-                  'startAt': e.startAt?.toIso8601String(),
-                })
-            .toList();
-      }
-    } else {
-      response['hasEvent'] = false;
-    }
-
-    return response;
+    return await routeQuickCaptureParse(
+      text: trimmed,
+      nerHints: nerHints,
+      dateHints: dateHints,
+      settingsPreferencesStore: widget.dependencies.settingsPreferencesStore,
+      aiService: widget.dependencies.aiService,
+      fetchContacts: () => widget.dependencies.contactService.getContacts(),
+      fetchEventsByDate: (d) => widget.dependencies.eventService.getEventsByDate(d),
+    );
   }
 
   /// 根据 Swift 侧用户确认结果，执行创建/关联/保存。
@@ -308,35 +295,88 @@ class _MyAppState extends State<MyApp> {
     if (eventAction == 'link') {
       linkedEventId = args['eventId'] as String?;
     } else if (eventAction == 'create') {
-      final title = args['newEventTitle'] as String?;
       final dateStr = args['eventDate'] as String?;
-      if (title != null && title.trim().isNotEmpty && dateStr != null) {
+      // Support both newEventTitles (array) and legacy newEventTitle (string)
+      final rawTitles = args['newEventTitles'];
+      final List<String> titles;
+      if (rawTitles is List && rawTitles.isNotEmpty) {
+        titles = rawTitles.map((t) => t.toString().trim()).where((t) => t.isNotEmpty).toList();
+      } else {
+        final single = (args['newEventTitle'] as String?)?.trim() ?? '';
+        titles = single.isNotEmpty ? [single] : [];
+      }
+      if (titles.isNotEmpty) {
+        final startAt = (dateStr != null && dateStr.isNotEmpty)
+            ? DateTime.tryParse(dateStr)
+            : DateTime.now();
         final participantIds = <String>[];
         if (linkedContactId != null) participantIds.add(linkedContactId);
-        final newEvent = await widget.dependencies.eventService.createEvent(
-          EventDraft(
-            title: title.trim(),
-            startAt: DateTime.tryParse(dateStr),
-            participantIds: participantIds,
-            participantRoles: const {},
-          ),
+        for (final title in titles) {
+          final newEvent = await widget.dependencies.eventService.createEvent(
+            EventDraft(
+              title: title,
+              startAt: startAt,
+              participantIds: participantIds,
+              participantRoles: const {},
+            ),
+          );
+          linkedEventId ??= newEvent.id; // link note to first created event (table stores single linkedEventId)
+        }
+      }
+    }
+
+    // ── 信息标签处理 ──
+    // infoTags 现在是结构化数组 [{contact: "张三", tags: ["CTO", "45岁"]}, ...]
+    // 只挂载与已链接联系人名字匹配的 tags，避免跨联系人污染
+    final rawInfoTags = args['infoTags'] as List?;
+    if (rawInfoTags != null && rawInfoTags.isNotEmpty && linkedContactId != null) {
+      final linkedContact =
+          await widget.dependencies.contactService.getContact(linkedContactId);
+      final linkedName = linkedContact.name;
+      final matchedTags = <String>[];
+      for (final entry in rawInfoTags.whereType<Map>()) {
+        final entryContact = entry['contact']?.toString() ?? '';
+        if (linkedName.isNotEmpty &&
+            (entryContact == linkedName ||
+             linkedName.contains(entryContact) ||
+             entryContact.contains(linkedName))) {
+          final tags = entry['tags'];
+          if (tags is List) {
+            matchedTags.addAll(
+              tags.map((t) => t.toString()).where((t) => t.isNotEmpty),
+            );
+          }
+        }
+      }
+      if (matchedTags.isNotEmpty) {
+        await widget.dependencies.infoTagService.applyTagsToContact(
+          linkedContactId,
+          matchedTags,
         );
-        linkedEventId = newEvent.id;
+        await widget.dependencies.contactProvider.loadContacts();
       }
     }
 
     // ── 保存 note ──
-    final noteType = (linkedContactId != null || linkedEventId != null)
-        ? 'structured'
-        : 'knowledge';
-    await widget.dependencies.quickCaptureService.saveNote(
-      text,
-      linkedContactId: linkedContactId,
-      linkedEventId: linkedEventId,
-      noteType: noteType,
-    );
-
-    unawaited(widget.dependencies.notesProvider.refresh());
+    // 批量队列中只有第一条记录保存原始文本（isFirstInBatch == false 表示后续队列项，跳过保存）
+    final saveNote = args['isFirstInBatch'] != false;
+    if (saveNote) {
+      // aiMetadata 保留结构化 infoTags 原始数据（供后续分析），已解析的 tags 存入 resolvedInfoTagsForNote
+      final aiMetadata = (rawInfoTags != null && rawInfoTags.isNotEmpty)
+          ? {'contactInfoTags': rawInfoTags}
+          : null;
+      final noteType = (linkedContactId != null || linkedEventId != null)
+          ? 'structured'
+          : 'knowledge';
+      await widget.dependencies.quickCaptureService.saveNote(
+        text,
+        linkedContactId: linkedContactId,
+        linkedEventId: linkedEventId,
+        noteType: noteType,
+        aiMetadata: aiMetadata,
+      );
+      unawaited(widget.dependencies.notesProvider.refresh());
+    }
   }
 }
 

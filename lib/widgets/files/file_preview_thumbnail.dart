@@ -29,7 +29,6 @@ class FilePreviewThumbnail extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(color: colorScheme.outlineVariant),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(

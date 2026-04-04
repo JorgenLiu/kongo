@@ -20,6 +20,9 @@ abstract class SettingsPreferencesStore {
   Future<String?> getString(String key);
   Future<void> setString(String key, String value);
   Future<void> removeKey(String key);
+  // Quick Capture: whether to route parsing to AI when available.
+  Future<bool> getQuickCaptureAiEnabled();
+  Future<void> setQuickCaptureAiEnabled(bool enabled);
 }
 
 class JsonSettingsPreferencesStore implements SettingsPreferencesStore {
@@ -39,6 +42,7 @@ class JsonSettingsPreferencesStore implements SettingsPreferencesStore {
   static const String _dailyBriefReminderMinuteKey = 'dailyBriefReminderMinute';
   static const String _eventDefaultOffsetKey = 'eventDefaultOffset';
   static const String _milestoneDefaultReminderDaysKey = 'milestoneDefaultReminderDaysBefore';
+  static const String _quickCaptureAiEnabledKey = 'quickCaptureAiEnabled';
 
   static const String _legacyContactMilestonesKey =
       'calendar_time_nodes.contact_milestone.enabled';
@@ -167,6 +171,22 @@ class JsonSettingsPreferencesStore implements SettingsPreferencesStore {
     final payload = await _loadPayload();
     final value = payload[key];
     return value is String ? value : null;
+  }
+
+  @override
+  Future<bool> getQuickCaptureAiEnabled() async {
+    final payload = await _loadPayload();
+    final raw = payload[_quickCaptureAiEnabledKey];
+    if (raw is bool) return raw;
+    if (raw is String) return raw == '1' || raw.toLowerCase() == 'true';
+    return false;
+  }
+
+  @override
+  Future<void> setQuickCaptureAiEnabled(bool enabled) async {
+    final payload = await _loadPayload();
+    payload[_quickCaptureAiEnabledKey] = enabled;
+    await _writePayload(payload);
   }
 
   @override

@@ -110,4 +110,12 @@ class _ThrowingNotesReadService implements NotesReadService {
   @override
   Future<int> countForDate(DateTime date) =>
       Future.error(Exception('DB 连接失败'));
+
+  @override
+  Future<List<QuickNote>> findByContactId(String contactId) =>
+      Future.error(Exception('DB 连接失败'));
+
+  @override
+  Future<List<QuickNote>> findByEventId(String eventId) =>
+      Future.error(Exception('DB 连接失败'));
 }

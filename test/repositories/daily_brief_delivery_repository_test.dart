@@ -120,4 +120,10 @@ class _InMemorySettingsPreferencesStore implements SettingsPreferencesStore {
   Future<void> setThemeMode(ThemeMode mode) async {
     _themeMode = mode;
   }
+
+  @override
+  Future<bool> getQuickCaptureAiEnabled() async => false;
+
+  @override
+  Future<void> setQuickCaptureAiEnabled(bool enabled) async {}
 }

@@ -43,6 +43,7 @@ abstract class AttachmentService {
   Future<Map<String, List<Attachment>>> getEventAttachmentsByEventIds(List<String> eventIds);
   Future<List<Attachment>> getSummaryAttachments(String summaryId);
   Future<Map<String, List<Attachment>>> getSummaryAttachmentsBySummaryIds(List<String> summaryIds);
+  Future<List<Attachment>> searchAttachments(String keyword);
 }
 
 class DefaultAttachmentService implements AttachmentService {
@@ -380,6 +381,11 @@ class DefaultAttachmentService implements AttachmentService {
   @override
   Future<Map<String, List<Attachment>>> getSummaryAttachmentsBySummaryIds(List<String> summaryIds) =>
       _linkService.getSummaryAttachmentsBySummaryIds(summaryIds);
+
+  @override
+  Future<List<Attachment>> searchAttachments(String keyword) async {
+    return _attachmentRepository.searchByKeyword(keyword);
+  }
 
   void _schedulePreviewRefresh(Attachment attachment, {bool force = false}) {
     final previewService = _attachmentPreviewService;

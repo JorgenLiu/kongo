@@ -16,6 +16,7 @@ import 'package:kongo/screens/events/event_detail_screen.dart';
 import 'package:kongo/screens/todos/todo_board_screen.dart';
 import 'package:kongo/services/read/contact_read_service.dart';
 import 'package:kongo/services/read/event_read_service.dart';
+import 'package:kongo/services/read/notes_read_service.dart';
 import 'package:kongo/services/read/todo_read_service.dart';
 import 'package:kongo/models/todo_group_draft.dart';
 import 'package:kongo/widgets/todo/todo_item_form_dialog.dart';
@@ -151,6 +152,7 @@ void main() {
       tester,
       () => find.widgetWithText(TextFormField, '待办项标题').evaluate().isNotEmpty,
     );
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.widgetWithText(TextFormField, '待办项标题'),
@@ -187,6 +189,9 @@ void main() {
           Provider<TodoReadService>.value(
             value: harness.dependencies.todoReadService,
           ),
+          Provider<NotesReadService>.value(
+            value: harness.dependencies.notesReadService,
+          ),
         ],
         child: MaterialApp(
           home: ContactDetailScreen(contactId: contactId),
@@ -216,6 +221,7 @@ void main() {
       tester,
       () => find.widgetWithText(TextFormField, '待办项标题').evaluate().isNotEmpty,
     );
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.widgetWithText(TextFormField, '待办项标题'),
@@ -252,6 +258,9 @@ void main() {
           Provider<TodoReadService>.value(
             value: harness.dependencies.todoReadService,
           ),
+          Provider<NotesReadService>.value(
+            value: harness.dependencies.notesReadService,
+          ),
         ],
         child: MaterialApp(
           home: EventDetailScreen(eventId: eventId),
@@ -280,6 +289,7 @@ void main() {
       tester,
       () => find.widgetWithText(TextFormField, '待办项标题').evaluate().isNotEmpty,
     );
+    await tester.pumpAndSettle();
 
     await tester.enterText(
       find.widgetWithText(TextFormField, '待办项标题'),
@@ -436,6 +446,7 @@ void main() {
       tester,
       find.widgetWithText(TextFormField, '待办项标题'),
     );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(Key('todoContact_filter_${filterTag.id}')));
     await tester.pump();
@@ -505,7 +516,10 @@ void main() {
       await pumpUntilFound(tester, find.byType(InkWell));
 
       await tester.tap(find.text('张三').first);
-      await pumpUntilFound(tester, find.text('联系人详情'));
+      await waitForAsyncCondition(
+        tester,
+        () async => find.text('联系信息').evaluate().isNotEmpty,
+      );
       await waitForAsyncCondition(
         tester,
         () async => find.text('当前还没有关联到这个联系人的待办项。').evaluate().isNotEmpty,
@@ -519,6 +533,7 @@ void main() {
         tester,
         find.widgetWithText(TextFormField, '待办项标题'),
       );
+      await tester.pumpAndSettle();
 
       await tester.enterText(
         find.widgetWithText(TextFormField, '待办项标题'),
@@ -561,6 +576,7 @@ void main() {
         tester,
         find.widgetWithText(TextFormField, '待办项标题'),
       );
+      await tester.pumpAndSettle();
 
       await tester.enterText(
         find.widgetWithText(TextFormField, '待办项标题'),

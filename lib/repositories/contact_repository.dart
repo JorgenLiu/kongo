@@ -183,12 +183,14 @@ ORDER BY t.name COLLATE NOCASE ASC
 
     final ids = rows.map((row) => row['id'] as String).toList();
     final tagsByContactId = await _loadTagsByContactIds(db, ids);
+    final infoTagsByContactId = await _loadInfoTagsByContactIds(db, ids);
 
     return rows
         .map(
           (row) => Contact.fromMap(
             Map<String, dynamic>.from(row),
             tags: tagsByContactId[row['id'] as String] ?? const [],
+            infoTags: infoTagsByContactId[row['id'] as String] ?? const [],
           ),
         )
         .toList();
@@ -210,6 +212,35 @@ FROM ${DatabaseService.contactTagsTable} ct
 JOIN ${DatabaseService.tagsTable} t ON t.id = ct.tagId
 WHERE ct.contactId IN ($placeholders)
 ORDER BY t.name COLLATE NOCASE ASC
+''',
+      contactIds,
+    );
+
+    final result = <String, List<String>>{};
+    for (final row in rows) {
+      final contactId = row['contactId'] as String;
+      final tagName = row['name'] as String;
+      result.putIfAbsent(contactId, () => <String>[]).add(tagName);
+    }
+    return result;
+  }
+
+  Future<Map<String, List<String>>> _loadInfoTagsByContactIds(
+    Database db,
+    List<String> contactIds,
+  ) async {
+    if (contactIds.isEmpty) {
+      return const {};
+    }
+
+    final placeholders = List.filled(contactIds.length, '?').join(', ');
+    final rows = await db.rawQuery(
+      '''
+SELECT cit.contactId, it.name
+FROM ${DatabaseService.contactInfoTagsTable} cit
+JOIN ${DatabaseService.infoTagsTable} it ON it.id = cit.infoTagId
+WHERE cit.contactId IN ($placeholders)
+ORDER BY it.name COLLATE NOCASE ASC
 ''',
       contactIds,
     );
